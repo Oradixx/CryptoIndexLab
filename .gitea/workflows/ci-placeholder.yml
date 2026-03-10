@@ -1,0 +1,30 @@
+name: Bootstrap Checks
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+  pull_request:
+
+jobs:
+  project-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify required directories
+        run: |
+          test -d frontend
+          test -d api1
+          test -d api2
+          test -d .gitea/workflows
+
+      - name: Verify required root files
+        run: |
+          test -f README.md
+          test -f AUTHORS.md
+          test -f .env.example
+          test -f docker-compose.yaml

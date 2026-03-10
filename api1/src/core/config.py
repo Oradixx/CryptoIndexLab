@@ -17,6 +17,10 @@ class Settings:
     port: int = _get_int_env("PORT", 8001)
     token_secret: str = os.getenv("API1_JWT_SECRET", "dev-only-change-me")
     token_ttl_seconds: int = _get_int_env("API1_TOKEN_TTL_SECONDS", 3600)
+    database_url: str = os.getenv(
+        "API1_DATABASE_URL",
+        "postgresql+psycopg2://crypto_user:crypto_pass@db1:5432/crypto_auth",
+    )
 
 
 settings = Settings()

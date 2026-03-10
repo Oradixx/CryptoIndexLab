@@ -18,14 +18,14 @@ The repository currently provides a clean microservices foundation. Authenticati
 
 ## API1 Current Scope
 
-`api1` now exposes a minimal FastAPI authentication skeleton with in-memory storage:
+`api1` now exposes a minimal FastAPI authentication service backed by its dedicated PostgreSQL database (`db1`):
 
 - `GET /health`
 - `POST /register`
 - `POST /login`
 - `GET /me`
 
-Passwords are hashed before storage, and `/me` is protected with a simple bearer token mechanism designed to be replaceable by JWT + database-backed auth in later commits.
+Passwords are hashed before storage, `/me` is protected with a simple bearer token mechanism, and the users table is auto-created at service startup (basic schema bootstrap before introducing migrations).
 
 ## Isolation Rules (Target)
 

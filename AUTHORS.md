@@ -2,4 +2,4 @@
 
 - VERVAELE--KLEIN Kellian 
 - VURPILLOT Clement
-- Houssam ELMOUEDDEN
+- ELMOUEDDEN Houssam 

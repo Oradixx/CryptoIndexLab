@@ -1,11 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from src.core.config import settings
 from src.core.security import SimpleTokenManager
+from src.db.init_db import init_db
 from src.routes.auth import router as auth_router
 from src.routes.health import router as health_router
-from src.services.auth_service import AuthService
-from src.services.user_store import InMemoryUserStore
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -13,14 +20,13 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description="User management and authentication service for CryptoIndexLab.",
+        lifespan=lifespan,
     )
 
-    user_store = InMemoryUserStore()
-    token_manager = SimpleTokenManager(
+    app.state.token_manager = SimpleTokenManager(
         secret_key=settings.token_secret,
         ttl_seconds=settings.token_ttl_seconds,
     )
-    app.state.auth_service = AuthService(user_store=user_store, token_manager=token_manager)
 
     app.include_router(health_router)
     app.include_router(auth_router)

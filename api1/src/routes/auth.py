@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.core.dependencies import get_auth_service, get_current_user
 from src.core.exceptions import DuplicateEmailError, InvalidCredentialsError
+from src.models.user import User
 from src.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from src.services.auth_service import AuthService
-from src.services.user_store import UserRecord
 
 router = APIRouter(tags=["auth"])
 
@@ -46,5 +46,5 @@ def login(
 
 
 @router.get("/me", response_model=UserResponse)
-def me(current_user: UserRecord = Depends(get_current_user)) -> UserResponse:
+def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)

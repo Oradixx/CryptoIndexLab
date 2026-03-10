@@ -27,9 +27,10 @@ services:
       API1_LOG_LEVEL: "${API1_LOG_LEVEL:-info}"
       API1_JWT_SECRET: "${API1_JWT_SECRET:-change_me_for_dev_only}"
       API1_TOKEN_TTL_SECONDS: "${API1_TOKEN_TTL_SECONDS:-3600}"
-      API1_DATABASE_URL: "${API1_DATABASE_URL:-postgresql://crypto_user:crypto_pass@db1:5432/crypto_auth}"
+      API1_DATABASE_URL: "${API1_DATABASE_URL:-postgresql+psycopg2://crypto_user:crypto_pass@db1:5432/crypto_auth}"
     depends_on:
-      - db1
+      db1:
+        condition: service_healthy
     networks:
       - cryptoindexlab-net
 
@@ -51,12 +52,15 @@ services:
   db1:
     image: postgres:16-alpine
     container_name: cryptoindexlab-db1
-    ports:
-      - "${DB1_PORT:-5433}:5432"
     environment:
       POSTGRES_DB: "${DB1_NAME:-crypto_auth}"
       POSTGRES_USER: "${DB1_USER:-crypto_user}"
       POSTGRES_PASSWORD: "${DB1_PASSWORD:-crypto_pass}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB1_USER:-crypto_user} -d ${DB1_NAME:-crypto_auth}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - db1-data:/var/lib/postgresql/data
     networks:

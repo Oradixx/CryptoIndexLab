@@ -14,7 +14,18 @@ Most simple crypto tools only track single assets. CryptoIndexLab focuses on use
 - `db1`: dedicated database for `api1`.
 - `db2`: dedicated database for `api2`.
 
-This first commit provides the project foundation only. Full authentication and crypto index business logic will be implemented in later iterations.
+The repository currently provides a clean microservices foundation. Authentication and crypto index business logic are being implemented incrementally.
+
+## API1 Current Scope
+
+`api1` now exposes a minimal FastAPI authentication skeleton with in-memory storage:
+
+- `GET /health`
+- `POST /register`
+- `POST /login`
+- `GET /me`
+
+Passwords are hashed before storage, and `/me` is protected with a simple bearer token mechanism designed to be replaceable by JWT + database-backed auth in later commits.
 
 ## Isolation Rules (Target)
 

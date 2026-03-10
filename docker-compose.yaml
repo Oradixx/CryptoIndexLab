@@ -26,6 +26,7 @@ services:
       PORT: 8001
       API1_LOG_LEVEL: "${API1_LOG_LEVEL:-info}"
       API1_JWT_SECRET: "${API1_JWT_SECRET:-change_me_for_dev_only}"
+      API1_TOKEN_TTL_SECONDS: "${API1_TOKEN_TTL_SECONDS:-3600}"
       API1_DATABASE_URL: "${API1_DATABASE_URL:-postgresql://crypto_user:crypto_pass@db1:5432/crypto_auth}"
     depends_on:
       - db1

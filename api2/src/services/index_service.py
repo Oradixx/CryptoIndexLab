@@ -1,35 +1,50 @@
-from datetime import datetime, timezone
-from threading import Lock
-from uuid import uuid4
+from sqlalchemy import desc, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from src.core.exceptions import DomainValidationError
 from src.models.asset import AvailableAsset
 from src.models.index import CryptoIndex, IndexAsset
+from src.services.market_data import MarketDataService
 from src.services.mock_data import AVAILABLE_ASSETS
 
 
 class IndexService:
-    def __init__(self) -> None:
+    def __init__(self, db_session: Session, market_data_service: MarketDataService) -> None:
+        self._db_session = db_session
+        self._market_data_service = market_data_service
         self._assets_by_symbol: dict[str, AvailableAsset] = {
             asset.symbol: asset for asset in AVAILABLE_ASSETS
         }
-        self._indexes: dict[str, CryptoIndex] = {}
-        self._lock = Lock()
 
     def list_available_assets(self) -> list[AvailableAsset]:
         return list(self._assets_by_symbol.values())
 
+    def resolve_asset_name(self, symbol: str) -> str:
+        asset = self._assets_by_symbol.get(symbol.upper())
+        return asset.name if asset else symbol.upper()
+
     def list_indexes(self) -> list[CryptoIndex]:
-        return list(self._indexes.values())
+        stmt = (
+            select(CryptoIndex)
+            .options(selectinload(CryptoIndex.assets))
+            .order_by(desc(CryptoIndex.created_at))
+        )
+        return list(self._db_session.scalars(stmt))
 
     def get_index(self, index_id: str) -> CryptoIndex | None:
-        return self._indexes.get(index_id)
+        stmt = (
+            select(CryptoIndex)
+            .where(CryptoIndex.id == index_id)
+            .options(selectinload(CryptoIndex.assets))
+        )
+        return self._db_session.scalar(stmt)
 
     def create_index(
         self,
         name: str,
         assets: list[tuple[str, float]],
-        owner_user_id: str | None,
+        user_id: str | None,
     ) -> CryptoIndex:
         normalized_name = name.strip()
         if not normalized_name:
@@ -38,9 +53,10 @@ class IndexService:
         if not assets:
             raise DomainValidationError("At least one asset is required.")
 
-        index_assets: list[IndexAsset] = []
         used_symbols: set[str] = set()
         total_weight = 0.0
+
+        created_index = CryptoIndex(name=normalized_name, user_id=user_id)
 
         for symbol, weight in assets:
             normalized_symbol = symbol.strip().upper()
@@ -58,25 +74,24 @@ class IndexService:
 
             total_weight += weight
             used_symbols.add(normalized_symbol)
-            index_assets.append(
+            created_index.assets.append(
                 IndexAsset(
                     symbol=asset.symbol,
-                    name=asset.name,
                     weight=round(weight, 4),
                 )
             )
 
         if total_weight > 100:
-            raise DomainValidationError("Total asset weight must be <= 100.")
-
-        with self._lock:
-            created_index = CryptoIndex(
-                id=str(uuid4()),
-                name=normalized_name,
-                assets=index_assets,
-                owner_user_id=owner_user_id,
-                created_at=datetime.now(timezone.utc),
+            raise DomainValidationError(
+                "Total asset weight must be <= 100 for the current policy."
             )
-            self._indexes[created_index.id] = created_index
 
-        return created_index
+        self._db_session.add(created_index)
+        try:
+            self._db_session.commit()
+        except IntegrityError as exc:
+            self._db_session.rollback()
+            raise DomainValidationError("Invalid index composition.") from exc
+
+        self._db_session.refresh(created_index)
+        return self.get_index(created_index.id) or created_index

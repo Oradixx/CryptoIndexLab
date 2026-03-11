@@ -19,7 +19,7 @@ class IndexAssetInput(BaseModel):
 class CreateIndexRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     assets: list[IndexAssetInput] = Field(min_length=1)
-    owner_user_id: str | None = Field(default=None, max_length=100)
+    user_id: str | None = Field(default=None, max_length=100)
 
     @field_validator("name")
     @classmethod
@@ -55,7 +55,7 @@ class IndexResponse(BaseModel):
     name: str
     assets: list[IndexAssetResponse]
     total_weight: float
-    owner_user_id: str | None = None
+    user_id: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

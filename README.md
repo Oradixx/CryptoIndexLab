@@ -29,7 +29,7 @@ Passwords are hashed before storage, `/me` is protected with a simple bearer tok
 
 ## API2 Current Scope
 
-`api2` now exposes a first FastAPI business skeleton for custom crypto indexes using in-memory/mock data:
+`api2` now exposes a FastAPI business service for custom crypto indexes backed by its dedicated PostgreSQL database (`db2`):
 
 - `GET /health`
 - `GET /assets/available`
@@ -37,7 +37,8 @@ Passwords are hashed before storage, `/me` is protected with a simple bearer tok
 - `GET /indexes/{index_id}`
 - `POST /indexes`
 
-This milestone validates the index domain shape (name, assets, weights, future owner linkage) before integrating real persistence, price feeds, and performance calculations.
+Indexes and index assets are now persisted (`Index` + `IndexAsset` tables), while `/assets/available` remains a controlled internal list of supported symbols.
+The codebase also includes a market-data service placeholder and symbol-to-provider mapping module to prepare the next milestone (historical price integration) without implementing external API fetching yet.
 
 ## Isolation Rules (Target)
 

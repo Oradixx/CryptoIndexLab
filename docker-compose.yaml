@@ -43,9 +43,10 @@ services:
     environment:
       PORT: 8002
       API2_LOG_LEVEL: "${API2_LOG_LEVEL:-info}"
-      API2_DATABASE_URL: "${API2_DATABASE_URL:-postgresql://crypto_user:crypto_pass@db2:5432/crypto_index}"
+      API2_DATABASE_URL: "${API2_DATABASE_URL:-postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index}"
     depends_on:
-      - db2
+      db2:
+        condition: service_healthy
     networks:
       - cryptoindexlab-net
 
@@ -69,12 +70,15 @@ services:
   db2:
     image: postgres:16-alpine
     container_name: cryptoindexlab-db2
-    ports:
-      - "${DB2_PORT:-5434}:5432"
     environment:
       POSTGRES_DB: "${DB2_NAME:-crypto_index}"
       POSTGRES_USER: "${DB2_USER:-crypto_user}"
       POSTGRES_PASSWORD: "${DB2_PASSWORD:-crypto_pass}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB2_USER:-crypto_user} -d ${DB2_NAME:-crypto_index}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - db2-data:/var/lib/postgresql/data
     networks:

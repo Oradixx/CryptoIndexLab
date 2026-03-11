@@ -12,4 +12,4 @@ COPY src ./src
 
 EXPOSE 8002
 
-CMD ["python", "src/main.py"]
+CMD ["python", "-m", "src.main"]

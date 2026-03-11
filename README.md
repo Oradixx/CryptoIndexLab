@@ -27,6 +27,18 @@ The repository currently provides a clean microservices foundation. Authenticati
 
 Passwords are hashed before storage, `/me` is protected with a simple bearer token mechanism, and the users table is auto-created at service startup (basic schema bootstrap before introducing migrations).
 
+## API2 Current Scope
+
+`api2` now exposes a first FastAPI business skeleton for custom crypto indexes using in-memory/mock data:
+
+- `GET /health`
+- `GET /assets/available`
+- `GET /indexes`
+- `GET /indexes/{index_id}`
+- `POST /indexes`
+
+This milestone validates the index domain shape (name, assets, weights, future owner linkage) before integrating real persistence, price feeds, and performance calculations.
+
 ## Isolation Rules (Target)
 
 - `api1` writes only to `db1`.

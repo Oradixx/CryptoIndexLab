@@ -8,8 +8,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     environment:
-      FRONTEND_PUBLIC_API1_URL: "${FRONTEND_PUBLIC_API1_URL:-http://api1:8001}"
-      FRONTEND_PUBLIC_API2_URL: "${FRONTEND_PUBLIC_API2_URL:-http://api2:8002}"
+      FRONTEND_PUBLIC_API1_URL: "${FRONTEND_PUBLIC_API1_URL:-/api1}"
+      FRONTEND_PUBLIC_API2_URL: "${FRONTEND_PUBLIC_API2_URL:-/api2}"
     depends_on:
       - api1
       - api2

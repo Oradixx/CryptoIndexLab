@@ -1,57 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CryptoIndexLab</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: "Segoe UI", sans-serif;
-      background: #f2f5f9;
-      color: #1f2937;
-    }
-
-    main {
-      max-width: 760px;
-      margin: 48px auto;
-      padding: 24px;
-      background: #ffffff;
-      border: 1px solid #dbe1ea;
-      border-radius: 12px;
-      box-shadow: 0 10px 25px rgba(31, 41, 55, 0.08);
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    ul {
-      padding-left: 20px;
-    }
-
-    .tag {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #e2e8f0;
-      font-size: 0.85rem;
-      margin-bottom: 16px;
-    }
-  </style>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./config.js"></script>
+  <script type="module" src="./js/main.js"></script>
 </head>
 <body>
-  <main>
-    <span class="tag">Frontend Placeholder</span>
-    <h1>CryptoIndexLab</h1>
-    <p>This service is the initial web interface scaffold for the microservices project.</p>
-    <h2>Planned UI Areas</h2>
-    <ul>
-      <li>User signup/login screens (connected to <code>api1</code>).</li>
-      <li>Crypto index creation and management screens (connected to <code>api2</code>).</li>
-      <li>Portfolio/index overview dashboard.</li>
-    </ul>
-    <p>Iteration 1 focus: repository, services, and Docker foundation.</p>
-  </main>
+  <div id="app"></div>
 </body>
 </html>

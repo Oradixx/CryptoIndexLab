@@ -1,0 +1,4 @@
+window.__CRYPTO_INDEX_LAB_CONFIG__ = {
+  api1BaseUrl: "${FRONTEND_PUBLIC_API1_URL}",
+  api2BaseUrl: "${FRONTEND_PUBLIC_API2_URL}",
+};

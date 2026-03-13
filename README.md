@@ -8,7 +8,7 @@ Most simple crypto tools only track single assets. CryptoIndexLab focuses on use
 
 ## Architecture Overview
 
-- `frontend`: web UI placeholder for authentication and index management flows.
+- `frontend`: MVP web app (login, register, dashboard, create-index form) connected to backend APIs.
 - `api1`: users/authentication service (accounts, login, identity endpoints).
 - `api2`: crypto index business service (index creation and management logic).
 - `db1`: dedicated database for `api1`.
@@ -43,6 +43,18 @@ Indexes and index assets are now persisted (`Index` + `IndexAsset` tables), whil
 `api2` can now fetch daily historical crypto prices (about 1 year) through a dedicated market-data service, with symbol mapping, response normalization, and lightweight in-memory caching for repeated requests.
 Supported market-history symbols include `BTC`, `ETH`, `SOL`, `XRP`, `DOGE` (plus `ADA` and `BNB`).
 Saved indexes can now return a historical performance series (normalized base value, daily points, and simple return summary) to power future frontend charts.
+
+## Frontend Current Scope
+
+The frontend now provides the first usable MVP flow:
+
+- Login page (`api1` `/login` + `/me`)
+- Register page (`api1` `/register`)
+- Authenticated dashboard with list of saved indexes (`api2` `/indexes`)
+- Create-index page with asset/weight form validation (`api2` `/assets/available` + `/indexes`)
+
+Authentication state is handled client-side with a stored bearer token.
+By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, so the browser can call backend services without extra CORS configuration.
 
 ## Isolation Rules (Target)
 

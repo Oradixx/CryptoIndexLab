@@ -148,6 +148,8 @@ export async function mountIndexDetailView(
     const message =
       statusCode === 404
         ? "This index does not exist."
+        : statusCode === 403
+          ? "You are not allowed to access this index."
         : error instanceof Error
           ? error.message
           : "Failed to load index detail.";
@@ -210,8 +212,11 @@ export async function mountIndexDetailView(
       ${renderPerformancePanel(performance)}
     `;
   } catch (error) {
+    const statusCode = error && typeof error === "object" ? error.statusCode : null;
     const message =
-      error instanceof Error
+      statusCode === 403
+        ? "You are not allowed to access this index performance."
+        : error instanceof Error
         ? error.message
         : "Failed to load performance data.";
     performanceSection.innerHTML = `

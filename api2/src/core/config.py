@@ -73,6 +73,14 @@ class Settings:
         300,
     )
     market_data_api_key: str | None = _get_optional_env("API2_MARKET_DATA_API_KEY")
+    auth_api1_me_url: str = _get_normalized_env(
+        "API2_AUTH_API1_ME_URL",
+        "http://api1:8001/me",
+    )
+    auth_timeout_seconds: float = _get_positive_float_env(
+        "API2_AUTH_TIMEOUT_SECONDS",
+        5.0,
+    )
 
 
 settings = Settings()

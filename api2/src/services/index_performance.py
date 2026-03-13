@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from src.core.exceptions import (
+    ForbiddenIndexAccessError,
     InsufficientHistoricalDataError,
     InvalidIndexCompositionError,
 )
@@ -33,10 +34,14 @@ class IndexPerformanceService:
     def calculate_index_performance(
         self,
         index_id: str,
+        user_id: str,
         base_value: float = DEFAULT_BASE_VALUE,
     ) -> IndexPerformanceResponse | None:
-        index_obj = self._get_index(index_id)
+        normalized_user_id = user_id.strip()
+        index_obj = self._get_index(index_id=index_id, user_id=normalized_user_id)
         if not index_obj:
+            if self._index_exists(index_id):
+                raise ForbiddenIndexAccessError("You are not allowed to access this index.")
             return None
 
         if base_value <= 0:
@@ -106,13 +111,20 @@ class IndexPerformanceService:
             ),
         )
 
-    def _get_index(self, index_id: str) -> CryptoIndex | None:
+    def _get_index(self, index_id: str, user_id: str) -> CryptoIndex | None:
         stmt = (
             select(CryptoIndex)
-            .where(CryptoIndex.id == index_id)
+            .where(
+                CryptoIndex.id == index_id,
+                CryptoIndex.user_id == user_id,
+            )
             .options(selectinload(CryptoIndex.assets))
         )
         return self._db_session.scalar(stmt)
+
+    def _index_exists(self, index_id: str) -> bool:
+        stmt = select(CryptoIndex.id).where(CryptoIndex.id == index_id).limit(1)
+        return self._db_session.scalar(stmt) is not None
 
     def _normalize_weights(self, index_obj: CryptoIndex) -> dict[str, float]:
         raw_weights: dict[str, float] = {}

@@ -1,8 +1,13 @@
 import { requestJson } from "./api-client.js";
 
 export class IndexService {
-  constructor(api2BaseUrl) {
+  constructor(api2BaseUrl, getToken) {
     this.api2BaseUrl = api2BaseUrl;
+    this._getToken = typeof getToken === "function" ? getToken : () => null;
+  }
+
+  _authToken() {
+    return this._getToken();
   }
 
   async listAvailableAssets() {
@@ -13,15 +18,15 @@ export class IndexService {
     return response?.assets || [];
   }
 
-  async createIndex({ name, assets, userId }) {
+  async createIndex({ name, assets }) {
     return requestJson({
       baseUrl: this.api2BaseUrl,
       path: "/indexes",
       method: "POST",
+      token: this._authToken(),
       body: {
         name,
         assets,
-        user_id: userId || null,
       },
     });
   }
@@ -30,6 +35,7 @@ export class IndexService {
     const response = await requestJson({
       baseUrl: this.api2BaseUrl,
       path: "/indexes",
+      token: this._authToken(),
     });
     return response?.indexes || [];
   }
@@ -38,6 +44,7 @@ export class IndexService {
     return requestJson({
       baseUrl: this.api2BaseUrl,
       path: `/indexes/${encodeURIComponent(indexId)}`,
+      token: this._authToken(),
     });
   }
 
@@ -45,6 +52,7 @@ export class IndexService {
     return requestJson({
       baseUrl: this.api2BaseUrl,
       path: `/indexes/${encodeURIComponent(indexId)}/performance`,
+      token: this._authToken(),
     });
   }
 }

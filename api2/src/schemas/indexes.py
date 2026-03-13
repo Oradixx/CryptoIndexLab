@@ -19,7 +19,6 @@ class IndexAssetInput(BaseModel):
 class CreateIndexRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     assets: list[IndexAssetInput] = Field(min_length=1)
-    user_id: str | None = Field(default=None, max_length=100)
 
     @field_validator("name")
     @classmethod

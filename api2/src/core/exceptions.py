@@ -2,6 +2,18 @@ class DomainValidationError(Exception):
     pass
 
 
+class AuthorizationError(Exception):
+    pass
+
+
+class UnauthorizedRequestError(AuthorizationError):
+    pass
+
+
+class ForbiddenIndexAccessError(AuthorizationError):
+    pass
+
+
 class MarketDataError(Exception):
     pass
 

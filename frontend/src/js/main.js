@@ -43,7 +43,7 @@ function loadConfig() {
 
 const config = loadConfig();
 const authService = new AuthService(config.api1BaseUrl);
-const indexService = new IndexService(config.api2BaseUrl);
+const indexService = new IndexService(config.api2BaseUrl, () => authService.getToken());
 
 function setFlashMessage(type, message) {
   state.flashMessage = { type, message };
@@ -139,10 +139,30 @@ async function restoreSession() {
 }
 
 async function loadUserIndexes() {
-  const indexes = await indexService.listIndexes();
-  return indexes.filter((indexObj) => {
-    return !indexObj.user_id || indexObj.user_id === state.currentUser?.id;
-  });
+  return runProtectedApiCall(() => indexService.listIndexes());
+}
+
+function normalizeApiError(error) {
+  if (error && typeof error === "object" && "statusCode" in error) {
+    return error;
+  }
+  return null;
+}
+
+async function runProtectedApiCall(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    const apiError = normalizeApiError(error);
+    if (apiError && apiError.statusCode === 401) {
+      authService.clearSession();
+      state.currentUser = null;
+      setFlashMessage("error", "Your session expired. Please login again.");
+      navigate(ROUTE_PATHS.login);
+      throw new Error("Unauthorized.");
+    }
+    throw error;
+  }
 }
 
 async function handleLogin({ email, password }) {
@@ -217,8 +237,10 @@ async function renderCurrentRoute() {
     await mountIndexDetailView(pageRoot, {
       indexId: route.params.indexId,
       onNavigate: navigate,
-      loadIndexDetail: (indexId) => indexService.getIndex(indexId),
-      loadPerformance: (indexId) => indexService.getIndexPerformance(indexId),
+      loadIndexDetail: (indexId) =>
+        runProtectedApiCall(() => indexService.getIndex(indexId)),
+      loadPerformance: (indexId) =>
+        runProtectedApiCall(() => indexService.getIndexPerformance(indexId)),
     });
     return;
   }
@@ -227,11 +249,12 @@ async function renderCurrentRoute() {
     await mountCreateIndexView(pageRoot, {
       loadAssets: () => indexService.listAvailableAssets(),
       onCreateIndex: ({ name, assets }) =>
-        indexService.createIndex({
-          name,
-          assets,
-          userId: state.currentUser?.id || null,
-        }),
+        runProtectedApiCall(() =>
+          indexService.createIndex({
+            name,
+            assets,
+          })
+        ),
     });
   }
 }

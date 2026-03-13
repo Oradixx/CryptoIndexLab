@@ -40,9 +40,11 @@ Passwords are hashed before storage, `/me` is protected with a simple bearer tok
 - `GET /indexes/{index_id}/performance`
 
 Indexes and index assets are now persisted (`Index` + `IndexAsset` tables), while `/assets/available` remains a controlled internal list of supported symbols.
+Indexes are now user-owned: authenticated index endpoints return only the current user's resources and reject cross-user access.
 `api2` can now fetch daily historical crypto prices (about 1 year) through a dedicated market-data service, with symbol mapping, response normalization, and lightweight in-memory caching for repeated requests.
 Supported market-history symbols include `BTC`, `ETH`, `SOL`, `XRP`, `DOGE` (plus `ADA` and `BNB`).
 Saved indexes can now return a historical performance series (normalized base value, daily points, and simple return summary) to power future frontend charts.
+`api2` remains decoupled from `api1` database by validating bearer tokens through the `api1` identity endpoint.
 
 ## Frontend Current Scope
 
@@ -57,6 +59,7 @@ The frontend now provides the first usable MVP flow:
 - Simple built-in line chart (SVG) for demo-friendly performance visualization
 
 Authentication state is handled client-side with a stored bearer token.
+Frontend sends authenticated requests to protected `api2` index endpoints so each user only sees and accesses their own indexes.
 By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, so the browser can call backend services without extra CORS configuration.
 
 ## Isolation Rules (Target)

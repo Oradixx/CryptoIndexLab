@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.core.dependencies import get_index_performance_service, get_index_service
+from src.core.dependencies import (
+    get_current_user_id,
+    get_index_performance_service,
+    get_index_service,
+)
 from src.core.exceptions import (
     DomainValidationError,
+    ForbiddenIndexAccessError,
     InsufficientHistoricalDataError,
     InvalidIndexCompositionError,
     MalformedMarketDataResponseError,
@@ -46,9 +51,10 @@ def _to_index_response(index: CryptoIndex, index_service: IndexService) -> Index
 
 @router.get("/indexes", response_model=IndexListResponse)
 def list_indexes(
+    current_user_id: str = Depends(get_current_user_id),
     index_service: IndexService = Depends(get_index_service),
 ) -> IndexListResponse:
-    indexes = index_service.list_indexes()
+    indexes = index_service.list_indexes(user_id=current_user_id)
     response_items = [_to_index_response(index_obj, index_service) for index_obj in indexes]
     return IndexListResponse(indexes=response_items, total=len(response_items))
 
@@ -56,10 +62,16 @@ def list_indexes(
 @router.get("/indexes/{index_id}", response_model=IndexResponse)
 def get_index(
     index_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     index_service: IndexService = Depends(get_index_service),
 ) -> IndexResponse:
-    index_obj = index_service.get_index(index_id)
+    index_obj = index_service.get_index(index_id=index_id, user_id=current_user_id)
     if not index_obj:
+        if index_service.index_exists(index_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not allowed to access this index.",
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Index not found.",
@@ -71,10 +83,16 @@ def get_index(
 @router.get("/indexes/{index_id}/performance", response_model=IndexPerformanceResponse)
 def get_index_performance(
     index_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     index_performance_service: IndexPerformanceService = Depends(get_index_performance_service),
 ) -> IndexPerformanceResponse:
     try:
-        performance = index_performance_service.calculate_index_performance(index_id=index_id)
+        performance = index_performance_service.calculate_index_performance(
+            index_id=index_id,
+            user_id=current_user_id,
+        )
+    except ForbiddenIndexAccessError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except (InvalidIndexCompositionError, InsufficientHistoricalDataError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except UnsupportedSymbolError as exc:
@@ -96,13 +114,14 @@ def get_index_performance(
 @router.post("/indexes", response_model=IndexResponse, status_code=status.HTTP_201_CREATED)
 def create_index(
     payload: CreateIndexRequest,
+    current_user_id: str = Depends(get_current_user_id),
     index_service: IndexService = Depends(get_index_service),
 ) -> IndexResponse:
     try:
         created_index = index_service.create_index(
             name=payload.name,
             assets=[(asset.symbol, asset.weight) for asset in payload.assets],
-            user_id=payload.user_id,
+            user_id=current_user_id,
         )
     except DomainValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

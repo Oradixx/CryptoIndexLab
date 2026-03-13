@@ -24,31 +24,44 @@ class IndexService:
         asset = self._assets_by_symbol.get(symbol.upper())
         return asset.name if asset else symbol.upper()
 
-    def list_indexes(self) -> list[CryptoIndex]:
+    def list_indexes(self, user_id: str) -> list[CryptoIndex]:
+        normalized_user_id = user_id.strip()
         stmt = (
             select(CryptoIndex)
+            .where(CryptoIndex.user_id == normalized_user_id)
             .options(selectinload(CryptoIndex.assets))
             .order_by(desc(CryptoIndex.created_at))
         )
         return list(self._db_session.scalars(stmt))
 
-    def get_index(self, index_id: str) -> CryptoIndex | None:
+    def get_index(self, index_id: str, user_id: str) -> CryptoIndex | None:
+        normalized_user_id = user_id.strip()
         stmt = (
             select(CryptoIndex)
-            .where(CryptoIndex.id == index_id)
+            .where(
+                CryptoIndex.id == index_id,
+                CryptoIndex.user_id == normalized_user_id,
+            )
             .options(selectinload(CryptoIndex.assets))
         )
         return self._db_session.scalar(stmt)
+
+    def index_exists(self, index_id: str) -> bool:
+        stmt = select(CryptoIndex.id).where(CryptoIndex.id == index_id).limit(1)
+        return self._db_session.scalar(stmt) is not None
 
     def create_index(
         self,
         name: str,
         assets: list[tuple[str, float]],
-        user_id: str | None,
+        user_id: str,
     ) -> CryptoIndex:
         normalized_name = name.strip()
         if not normalized_name:
             raise DomainValidationError("Index name is required.")
+        normalized_user_id = user_id.strip()
+        if not normalized_user_id:
+            raise DomainValidationError("Index owner is required.")
 
         if not assets:
             raise DomainValidationError("At least one asset is required.")
@@ -56,7 +69,7 @@ class IndexService:
         used_symbols: set[str] = set()
         total_weight = 0.0
 
-        created_index = CryptoIndex(name=normalized_name, user_id=user_id)
+        created_index = CryptoIndex(name=normalized_name, user_id=normalized_user_id)
 
         for symbol, weight in assets:
             normalized_symbol = symbol.strip().upper()
@@ -94,4 +107,4 @@ class IndexService:
             raise DomainValidationError("Invalid index composition.") from exc
 
         self._db_session.refresh(created_index)
-        return self.get_index(created_index.id) or created_index
+        return self.get_index(created_index.id, normalized_user_id) or created_index

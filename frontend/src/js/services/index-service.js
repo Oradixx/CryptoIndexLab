@@ -55,4 +55,26 @@ export class IndexService {
       token: this._authToken(),
     });
   }
+
+  async updateIndex(indexId, { name, assets }) {
+    return requestJson({
+      baseUrl: this.api2BaseUrl,
+      path: `/indexes/${encodeURIComponent(indexId)}`,
+      method: "PUT",
+      token: this._authToken(),
+      body: {
+        name,
+        assets,
+      },
+    });
+  }
+
+  async deleteIndex(indexId) {
+    return requestJson({
+      baseUrl: this.api2BaseUrl,
+      path: `/indexes/${encodeURIComponent(indexId)}`,
+      method: "DELETE",
+      token: this._authToken(),
+    });
+  }
 }

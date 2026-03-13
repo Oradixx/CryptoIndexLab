@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from src.core.dependencies import (
     get_current_user_id,
@@ -21,6 +21,7 @@ from src.schemas.indexes import (
     IndexAssetResponse,
     IndexListResponse,
     IndexResponse,
+    UpdateIndexRequest,
 )
 from src.schemas.performance import IndexPerformanceResponse
 from src.services.index_performance import IndexPerformanceService
@@ -127,3 +128,55 @@ def create_index(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return _to_index_response(created_index, index_service)
+
+
+@router.put("/indexes/{index_id}", response_model=IndexResponse)
+def update_index(
+    index_id: str,
+    payload: UpdateIndexRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    index_service: IndexService = Depends(get_index_service),
+) -> IndexResponse:
+    try:
+        updated_index = index_service.update_index(
+            index_id=index_id,
+            name=payload.name,
+            assets=[(asset.symbol, asset.weight) for asset in payload.assets],
+            user_id=current_user_id,
+        )
+    except DomainValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if not updated_index:
+        if index_service.index_exists(index_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not allowed to access this index.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Index not found.",
+        )
+
+    return _to_index_response(updated_index, index_service)
+
+
+@router.delete("/indexes/{index_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_index(
+    index_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    index_service: IndexService = Depends(get_index_service),
+) -> Response:
+    deleted = index_service.delete_index(index_id=index_id, user_id=current_user_id)
+    if not deleted:
+        if index_service.index_exists(index_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not allowed to access this index.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Index not found.",
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

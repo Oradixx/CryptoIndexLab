@@ -41,6 +41,10 @@ class CreateIndexRequest(BaseModel):
         return self
 
 
+class UpdateIndexRequest(CreateIndexRequest):
+    pass
+
+
 class IndexAssetResponse(BaseModel):
     symbol: str
     name: str

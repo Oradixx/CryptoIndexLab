@@ -10,6 +10,7 @@ const PROTECTED_ROUTE_NAMES = new Set([
   "dashboard",
   "indexList",
   "indexDetail",
+  "indexEdit",
   "createIndex",
 ]);
 const AUTH_ROUTE_NAMES = new Set(["login", "register"]);
@@ -24,6 +25,10 @@ function normalizeHashPath() {
 
 export function buildIndexDetailPath(indexId) {
   return `${ROUTE_PATHS.indexList}/${encodeURIComponent(indexId)}`;
+}
+
+export function buildIndexEditPath(indexId) {
+  return `${buildIndexDetailPath(indexId)}/edit`;
 }
 
 export function getCurrentRoute() {
@@ -47,7 +52,19 @@ export function getCurrentRoute() {
 
   if (path.startsWith(`${ROUTE_PATHS.indexList}/`)) {
     try {
-      const indexId = decodeURIComponent(path.slice(`${ROUTE_PATHS.indexList}/`.length));
+      const pathSuffix = path.slice(`${ROUTE_PATHS.indexList}/`.length);
+      if (pathSuffix.endsWith("/edit")) {
+        const indexId = decodeURIComponent(pathSuffix.slice(0, -"/edit".length));
+        if (indexId) {
+          return {
+            name: "indexEdit",
+            path,
+            params: { indexId },
+          };
+        }
+      }
+
+      const indexId = decodeURIComponent(pathSuffix);
       if (indexId) {
         return {
           name: "indexDetail",

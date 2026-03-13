@@ -2,6 +2,7 @@ import { AuthService } from "./services/auth-service.js";
 import { IndexService } from "./services/index-service.js";
 import {
   ROUTE_PATHS,
+  buildIndexEditPath,
   buildIndexDetailPath,
   getCurrentRoute,
   isAuthRoute,
@@ -10,6 +11,7 @@ import {
 } from "./router.js";
 import { mountCreateIndexView } from "./views/create-index-view.js";
 import { mountDashboardView } from "./views/dashboard-view.js";
+import { mountEditIndexView } from "./views/edit-index-view.js";
 import { mountIndexDetailView } from "./views/index-detail-view.js";
 import { mountIndexListView } from "./views/index-list-view.js";
 import { mountLoginView } from "./views/login-view.js";
@@ -57,7 +59,8 @@ function consumeFlashMessage() {
 
 function renderTopbar(route) {
   const loggedIn = Boolean(state.currentUser);
-  const indexesActive = route.name === "indexList" || route.name === "indexDetail";
+  const indexesActive =
+    route.name === "indexList" || route.name === "indexDetail" || route.name === "indexEdit";
 
   const authLinks = `
     <a class="nav-link ${route.name === "login" ? "active" : ""}" href="#${ROUTE_PATHS.login}">Login</a>
@@ -241,6 +244,22 @@ async function renderCurrentRoute() {
         runProtectedApiCall(() => indexService.getIndex(indexId)),
       loadPerformance: (indexId) =>
         runProtectedApiCall(() => indexService.getIndexPerformance(indexId)),
+      onEditIndex: (indexId) => navigate(buildIndexEditPath(indexId)),
+      onDeleteIndex: (indexId) =>
+        runProtectedApiCall(() => indexService.deleteIndex(indexId)),
+    });
+    return;
+  }
+
+  if (route.name === "indexEdit") {
+    await mountEditIndexView(pageRoot, {
+      indexId: route.params.indexId,
+      onNavigate: navigate,
+      loadAssets: () => indexService.listAvailableAssets(),
+      loadIndexDetail: (indexId) =>
+        runProtectedApiCall(() => indexService.getIndex(indexId)),
+      onUpdateIndex: (indexId, payload) =>
+        runProtectedApiCall(() => indexService.updateIndex(indexId, payload)),
     });
     return;
   }

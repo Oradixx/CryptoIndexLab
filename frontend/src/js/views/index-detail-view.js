@@ -128,7 +128,14 @@ function renderPerformancePanel(performance) {
 
 export async function mountIndexDetailView(
   root,
-  { indexId, loadIndexDetail, loadPerformance, onNavigate }
+  {
+    indexId,
+    loadIndexDetail,
+    loadPerformance,
+    onNavigate,
+    onEditIndex,
+    onDeleteIndex,
+  }
 ) {
   root.innerHTML = `
     <section class="panel stack">
@@ -174,7 +181,11 @@ export async function mountIndexDetailView(
       <div class="button-row">
         <button class="button button-secondary" type="button" data-back-list>Back to list</button>
         <button class="button button-secondary" type="button" data-create-index>Create new index</button>
+        <button class="button button-secondary" type="button" data-edit-index>Edit index</button>
+        <button class="button button-danger" type="button" data-delete-index>Delete index</button>
       </div>
+      <div class="alert alert-success" data-action-success hidden></div>
+      <div class="alert alert-error" data-action-error hidden></div>
       <div>
         <h2 class="page-title">${escapeHtml(indexDetail.name)}</h2>
         <p class="page-subtitle">
@@ -200,6 +211,45 @@ export async function mountIndexDetailView(
   });
   content.querySelector("[data-create-index]").addEventListener("click", () => {
     onNavigate(ROUTE_PATHS.createIndex);
+  });
+  content.querySelector("[data-edit-index]").addEventListener("click", () => {
+    onEditIndex(indexId);
+  });
+
+  const actionSuccess = content.querySelector("[data-action-success]");
+  const actionError = content.querySelector("[data-action-error]");
+  const deleteButton = content.querySelector("[data-delete-index]");
+  deleteButton.addEventListener("click", async () => {
+    actionSuccess.hidden = true;
+    actionError.hidden = true;
+
+    if (!window.confirm("Delete this index permanently?")) {
+      return;
+    }
+
+    deleteButton.disabled = true;
+    try {
+      await onDeleteIndex(indexId);
+      actionSuccess.textContent = "Index deleted successfully.";
+      actionSuccess.hidden = false;
+      setTimeout(() => {
+        onNavigate(ROUTE_PATHS.indexList);
+      }, 400);
+    } catch (error) {
+      const statusCode = error && typeof error === "object" ? error.statusCode : null;
+      const message =
+        statusCode === 403
+          ? "You are not allowed to delete this index."
+          : statusCode === 404
+            ? "This index no longer exists."
+            : error instanceof Error
+              ? error.message
+              : "Failed to delete index.";
+      actionError.textContent = message;
+      actionError.hidden = false;
+    } finally {
+      deleteButton.disabled = false;
+    }
   });
 
   const performanceSection = content.querySelector("[data-performance-section]");

@@ -56,20 +56,79 @@ class IndexService:
         assets: list[tuple[str, float]],
         user_id: str,
     ) -> CryptoIndex:
-        normalized_name = name.strip()
-        if not normalized_name:
-            raise DomainValidationError("Index name is required.")
+        normalized_name = self._normalize_index_name(name)
+        normalized_user_id = self._normalize_user_id(user_id)
+        validated_assets = self._validate_assets(assets)
+        created_index = CryptoIndex(name=normalized_name, user_id=normalized_user_id)
+        created_index.assets.extend(validated_assets)
+
+        self._db_session.add(created_index)
+        try:
+            self._db_session.commit()
+        except IntegrityError as exc:
+            self._db_session.rollback()
+            raise DomainValidationError("Invalid index composition.") from exc
+
+        self._db_session.refresh(created_index)
+        return self.get_index(created_index.id, normalized_user_id) or created_index
+
+    def update_index(
+        self,
+        index_id: str,
+        name: str,
+        assets: list[tuple[str, float]],
+        user_id: str,
+    ) -> CryptoIndex | None:
+        normalized_user_id = self._normalize_user_id(user_id)
+        existing_index = self.get_index(index_id=index_id, user_id=normalized_user_id)
+        if not existing_index:
+            return None
+
+        normalized_name = self._normalize_index_name(name)
+        validated_assets = self._validate_assets(assets)
+
+        existing_index.name = normalized_name
+        existing_index.assets.clear()
+        existing_index.assets.extend(validated_assets)
+
+        try:
+            self._db_session.commit()
+        except IntegrityError as exc:
+            self._db_session.rollback()
+            raise DomainValidationError("Invalid index composition.") from exc
+
+        self._db_session.refresh(existing_index)
+        return self.get_index(index_id=index_id, user_id=normalized_user_id) or existing_index
+
+    def delete_index(self, index_id: str, user_id: str) -> bool:
+        normalized_user_id = self._normalize_user_id(user_id)
+        existing_index = self.get_index(index_id=index_id, user_id=normalized_user_id)
+        if not existing_index:
+            return False
+
+        self._db_session.delete(existing_index)
+        self._db_session.commit()
+        return True
+
+    def _normalize_user_id(self, user_id: str) -> str:
         normalized_user_id = user_id.strip()
         if not normalized_user_id:
             raise DomainValidationError("Index owner is required.")
+        return normalized_user_id
 
+    def _normalize_index_name(self, name: str) -> str:
+        normalized_name = name.strip()
+        if not normalized_name:
+            raise DomainValidationError("Index name is required.")
+        return normalized_name
+
+    def _validate_assets(self, assets: list[tuple[str, float]]) -> list[IndexAsset]:
         if not assets:
             raise DomainValidationError("At least one asset is required.")
 
         used_symbols: set[str] = set()
         total_weight = 0.0
-
-        created_index = CryptoIndex(name=normalized_name, user_id=normalized_user_id)
+        validated_assets: list[IndexAsset] = []
 
         for symbol, weight in assets:
             normalized_symbol = symbol.strip().upper()
@@ -87,7 +146,7 @@ class IndexService:
 
             total_weight += weight
             used_symbols.add(normalized_symbol)
-            created_index.assets.append(
+            validated_assets.append(
                 IndexAsset(
                     symbol=asset.symbol,
                     weight=round(weight, 4),
@@ -99,12 +158,4 @@ class IndexService:
                 "Total asset weight must be <= 100 for the current policy."
             )
 
-        self._db_session.add(created_index)
-        try:
-            self._db_session.commit()
-        except IntegrityError as exc:
-            self._db_session.rollback()
-            raise DomainValidationError("Invalid index composition.") from exc
-
-        self._db_session.refresh(created_index)
-        return self.get_index(created_index.id, normalized_user_id) or created_index
+        return validated_assets

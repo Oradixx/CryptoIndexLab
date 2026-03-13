@@ -36,6 +36,8 @@ Passwords are hashed before storage, `/me` is protected with a simple bearer tok
 - `GET /indexes`
 - `GET /indexes/{index_id}`
 - `POST /indexes`
+- `PUT /indexes/{index_id}`
+- `DELETE /indexes/{index_id}`
 - `GET /market/history/{symbol}`
 - `GET /indexes/{index_id}/performance`
 
@@ -44,6 +46,7 @@ Indexes are now user-owned: authenticated index endpoints return only the curren
 `api2` can now fetch daily historical crypto prices (about 1 year) through a dedicated market-data service, with symbol mapping, response normalization, and lightweight in-memory caching for repeated requests.
 Supported market-history symbols include `BTC`, `ETH`, `SOL`, `XRP`, `DOGE` (plus `ADA` and `BNB`).
 Saved indexes can now return a historical performance series (normalized base value, daily points, and simple return summary) to power future frontend charts.
+User-owned indexes now support full CRUD updates: owners can edit index name/composition and delete indexes, while cross-user edit/delete access is rejected.
 `api2` remains decoupled from `api1` database by validating bearer tokens through the `api1` identity endpoint.
 
 ## Frontend Current Scope
@@ -56,6 +59,8 @@ The frontend now provides the first usable MVP flow:
 - Create-index page with asset/weight form validation (`api2` `/assets/available` + `/indexes`)
 - Dedicated index list view with quick summaries (`api2` `/indexes`)
 - Index detail view with composition and historical performance section (`api2` `/indexes/{index_id}` + `/indexes/{index_id}/performance`)
+- Index edit flow to update name/assets/weights (`api2` `PUT /indexes/{index_id}`)
+- Index delete action with confirmation (`api2` `DELETE /indexes/{index_id}`)
 - Simple built-in line chart (SVG) for demo-friendly performance visualization
 
 Authentication state is handled client-side with a stored bearer token.

@@ -5,14 +5,23 @@ services:
     build:
       context: ./frontend
     container_name: cryptoindexlab-frontend
+    restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     environment:
       FRONTEND_PUBLIC_API1_URL: "${FRONTEND_PUBLIC_API1_URL:-/api1}"
       FRONTEND_PUBLIC_API2_URL: "${FRONTEND_PUBLIC_API2_URL:-/api2}"
     depends_on:
-      - api1
-      - api2
+      api1:
+        condition: service_healthy
+      api2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - cryptoindexlab-net
 
@@ -20,6 +29,7 @@ services:
     build:
       context: ./api1
     container_name: cryptoindexlab-api1
+    restart: unless-stopped
     ports:
       - "${API1_PORT:-8001}:8001"
     environment:
@@ -28,9 +38,21 @@ services:
       API1_JWT_SECRET: "${API1_JWT_SECRET:-change_me_for_dev_only}"
       API1_TOKEN_TTL_SECONDS: "${API1_TOKEN_TTL_SECONDS:-3600}"
       API1_DATABASE_URL: "${API1_DATABASE_URL:-postgresql+psycopg2://crypto_user:crypto_pass@db1:5432/crypto_auth}"
+      API1_DB_INIT_MAX_ATTEMPTS: "${API1_DB_INIT_MAX_ATTEMPTS:-10}"
+      API1_DB_INIT_RETRY_DELAY_SECONDS: "${API1_DB_INIT_RETRY_DELAY_SECONDS:-2}"
     depends_on:
       db1:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('PORT', '8001') + '/health', timeout=2)\"",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - cryptoindexlab-net
 
@@ -38,12 +60,15 @@ services:
     build:
       context: ./api2
     container_name: cryptoindexlab-api2
+    restart: unless-stopped
     ports:
       - "${API2_PORT:-8002}:8002"
     environment:
       PORT: 8002
       API2_LOG_LEVEL: "${API2_LOG_LEVEL:-info}"
       API2_DATABASE_URL: "${API2_DATABASE_URL:-postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index}"
+      API2_DB_INIT_MAX_ATTEMPTS: "${API2_DB_INIT_MAX_ATTEMPTS:-10}"
+      API2_DB_INIT_RETRY_DELAY_SECONDS: "${API2_DB_INIT_RETRY_DELAY_SECONDS:-2}"
       API2_MARKET_DATA_BASE_URL: "${API2_MARKET_DATA_BASE_URL:-https://api.coingecko.com/api/v3}"
       API2_MARKET_DATA_TIMEOUT_SECONDS: "${API2_MARKET_DATA_TIMEOUT_SECONDS:-10}"
       API2_MARKET_DATA_CURRENCY: "${API2_MARKET_DATA_CURRENCY:-usd}"
@@ -55,12 +80,25 @@ services:
     depends_on:
       db2:
         condition: service_healthy
+      api1:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('PORT', '8002') + '/health', timeout=2)\"",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - cryptoindexlab-net
 
   db1:
     image: postgres:16-alpine
     container_name: cryptoindexlab-db1
+    restart: unless-stopped
     environment:
       POSTGRES_DB: "${DB1_NAME:-crypto_auth}"
       POSTGRES_USER: "${DB1_USER:-crypto_user}"
@@ -70,6 +108,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 5s
     volumes:
       - db1-data:/var/lib/postgresql/data
     networks:
@@ -78,6 +117,7 @@ services:
   db2:
     image: postgres:16-alpine
     container_name: cryptoindexlab-db2
+    restart: unless-stopped
     environment:
       POSTGRES_DB: "${DB2_NAME:-crypto_index}"
       POSTGRES_USER: "${DB2_USER:-crypto_user}"
@@ -87,6 +127,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 5s
     volumes:
       - db2-data:/var/lib/postgresql/data
     networks:

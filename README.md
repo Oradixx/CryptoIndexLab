@@ -77,3 +77,49 @@ By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, 
 ## Deployment Goal
 
 The final goal is a deployable Docker-based microservices app that can be started and tested by the professor with Docker Compose.
+
+## Run Locally with Docker Compose
+
+1. Create your local environment file:
+   - `cp .env.example .env` (Linux/macOS)
+   - `Copy-Item .env.example .env` (PowerShell)
+2. Start the full stack:
+   - `docker compose up --build -d`
+3. Check service status and health:
+   - `docker compose ps`
+4. Open the app:
+   - Frontend: `http://localhost:3000` (or `FRONTEND_PORT` if changed)
+
+### Exposed Services
+
+- Frontend (nginx): `localhost:${FRONTEND_PORT}` (default `3000`)
+- API1 (auth): `localhost:${API1_PORT}` (default `8001`)
+- API2 (index business): `localhost:${API2_PORT}` (default `8002`)
+- PostgreSQL databases are internal to Docker network and persisted with named volumes:
+  - `db1-data` for `api1`
+  - `db2-data` for `api2`
+
+### Service Relationships
+
+- `frontend` calls `api1` and `api2` through nginx proxy routes (`/api1/*`, `/api2/*`).
+- `api1` only connects to `db1`.
+- `api2` only connects to `db2` for persistence and calls `api1` `/me` to validate bearer tokens.
+- No backend service accesses the other backend's database.
+
+### Environment Variables
+
+- `.env.example` is aligned with compose defaults and Docker-internal hostnames (`api1`, `api2`, `db1`, `db2`).
+- `FRONTEND_PUBLIC_API1_URL` and `FRONTEND_PUBLIC_API2_URL` are browser-facing URLs (default proxied paths, not direct container hosts).
+- `API1_DB_INIT_MAX_ATTEMPTS` / `API2_DB_INIT_MAX_ATTEMPTS` and corresponding retry delay variables control lightweight DB init retries at startup.
+
+## Troubleshooting
+
+- Docker engine not running (Windows named pipe error):
+  - Start Docker Desktop, wait until it is fully running, then retry `docker compose up --build -d`.
+- Services still starting:
+  - Run `docker compose ps` and wait until healthchecks are `healthy`.
+- A backend fails to start:
+  - Inspect logs with `docker compose logs api1` or `docker compose logs api2`.
+- Need a clean restart:
+  - `docker compose down`
+  - `docker compose up --build -d`

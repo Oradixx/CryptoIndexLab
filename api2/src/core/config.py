@@ -55,6 +55,11 @@ class Settings:
         "API2_DATABASE_URL",
         "postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index",
     )
+    db_init_max_attempts: int = _get_positive_int_env("API2_DB_INIT_MAX_ATTEMPTS", 10)
+    db_init_retry_delay_seconds: float = _get_positive_float_env(
+        "API2_DB_INIT_RETRY_DELAY_SECONDS",
+        2.0,
+    )
     market_data_base_url: str = _get_normalized_env(
         "API2_MARKET_DATA_BASE_URL",
         "https://api.coingecko.com/api/v3",

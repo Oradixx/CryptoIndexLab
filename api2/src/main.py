@@ -7,6 +7,7 @@ from src.db.init_db import init_db
 from src.routes.assets import router as assets_router
 from src.routes.health import router as health_router
 from src.routes.indexes import router as indexes_router
+from src.routes.market import router as market_router
 from src.services.market_data import MarketDataService
 
 
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(assets_router)
     app.include_router(indexes_router)
+    app.include_router(market_router)
     return app
 
 

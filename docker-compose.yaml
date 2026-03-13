@@ -44,6 +44,12 @@ services:
       PORT: 8002
       API2_LOG_LEVEL: "${API2_LOG_LEVEL:-info}"
       API2_DATABASE_URL: "${API2_DATABASE_URL:-postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index}"
+      API2_MARKET_DATA_BASE_URL: "${API2_MARKET_DATA_BASE_URL:-https://api.coingecko.com/api/v3}"
+      API2_MARKET_DATA_TIMEOUT_SECONDS: "${API2_MARKET_DATA_TIMEOUT_SECONDS:-10}"
+      API2_MARKET_DATA_CURRENCY: "${API2_MARKET_DATA_CURRENCY:-usd}"
+      API2_MARKET_DATA_DAYS: "${API2_MARKET_DATA_DAYS:-365}"
+      API2_MARKET_DATA_CACHE_TTL_SECONDS: "${API2_MARKET_DATA_CACHE_TTL_SECONDS:-300}"
+      API2_MARKET_DATA_API_KEY: "${API2_MARKET_DATA_API_KEY:-}"
     depends_on:
       db2:
         condition: service_healthy

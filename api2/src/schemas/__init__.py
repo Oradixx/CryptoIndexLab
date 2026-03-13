@@ -6,6 +6,11 @@ from src.schemas.indexes import (
     IndexListResponse,
     IndexResponse,
 )
+from src.schemas.market import (
+    MarketHistoryPoint,
+    MarketHistoryRange,
+    MarketHistoryResponse,
+)
 
 __all__ = [
     "AvailableAssetResponse",
@@ -15,4 +20,7 @@ __all__ = [
     "IndexAssetResponse",
     "IndexListResponse",
     "IndexResponse",
+    "MarketHistoryPoint",
+    "MarketHistoryRange",
+    "MarketHistoryResponse",
 ]

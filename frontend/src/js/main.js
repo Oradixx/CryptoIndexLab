@@ -2,13 +2,16 @@ import { AuthService } from "./services/auth-service.js";
 import { IndexService } from "./services/index-service.js";
 import {
   ROUTE_PATHS,
-  getCurrentPath,
-  isAuthPath,
-  isProtectedPath,
+  buildIndexDetailPath,
+  getCurrentRoute,
+  isAuthRoute,
+  isProtectedRoute,
   navigate,
 } from "./router.js";
 import { mountCreateIndexView } from "./views/create-index-view.js";
 import { mountDashboardView } from "./views/dashboard-view.js";
+import { mountIndexDetailView } from "./views/index-detail-view.js";
+import { mountIndexListView } from "./views/index-list-view.js";
 import { mountLoginView } from "./views/login-view.js";
 import { mountRegisterView } from "./views/register-view.js";
 
@@ -52,17 +55,19 @@ function consumeFlashMessage() {
   return current;
 }
 
-function renderTopbar(activePath) {
+function renderTopbar(route) {
   const loggedIn = Boolean(state.currentUser);
+  const indexesActive = route.name === "indexList" || route.name === "indexDetail";
 
   const authLinks = `
-    <a class="nav-link ${activePath === ROUTE_PATHS.login ? "active" : ""}" href="#${ROUTE_PATHS.login}">Login</a>
-    <a class="nav-link ${activePath === ROUTE_PATHS.register ? "active" : ""}" href="#${ROUTE_PATHS.register}">Register</a>
+    <a class="nav-link ${route.name === "login" ? "active" : ""}" href="#${ROUTE_PATHS.login}">Login</a>
+    <a class="nav-link ${route.name === "register" ? "active" : ""}" href="#${ROUTE_PATHS.register}">Register</a>
   `;
 
   const appLinks = `
-    <a class="nav-link ${activePath === ROUTE_PATHS.dashboard ? "active" : ""}" href="#${ROUTE_PATHS.dashboard}">Dashboard</a>
-    <a class="nav-link ${activePath === ROUTE_PATHS.createIndex ? "active" : ""}" href="#${ROUTE_PATHS.createIndex}">Create Index</a>
+    <a class="nav-link ${route.name === "dashboard" ? "active" : ""}" href="#${ROUTE_PATHS.dashboard}">Dashboard</a>
+    <a class="nav-link ${indexesActive ? "active" : ""}" href="#${ROUTE_PATHS.indexList}">Indexes</a>
+    <a class="nav-link ${route.name === "createIndex" ? "active" : ""}" href="#${ROUTE_PATHS.createIndex}">Create Index</a>
     <button type="button" class="nav-button" data-logout>Logout</button>
   `;
 
@@ -70,7 +75,7 @@ function renderTopbar(activePath) {
     <header class="topbar">
       <div class="brand">
         <h1 class="brand-title">CryptoIndexLab</h1>
-        <p class="brand-subtitle">MVP interface for auth and custom index creation</p>
+        <p class="brand-subtitle">MVP interface for auth and custom index tracking</p>
       </div>
       <nav class="nav-links">
         ${loggedIn ? appLinks : authLinks}
@@ -79,10 +84,10 @@ function renderTopbar(activePath) {
   `;
 }
 
-function renderShell(activePath) {
+function renderShell(route) {
   appElement.innerHTML = `
     <div class="app-shell">
-      ${renderTopbar(activePath)}
+      ${renderTopbar(route)}
       <section id="flash-anchor"></section>
       <main id="page-root"></main>
     </div>
@@ -133,6 +138,13 @@ async function restoreSession() {
   }
 }
 
+async function loadUserIndexes() {
+  const indexes = await indexService.listIndexes();
+  return indexes.filter((indexObj) => {
+    return !indexObj.user_id || indexObj.user_id === state.currentUser?.id;
+  });
+}
+
 async function handleLogin({ email, password }) {
   const tokenResponse = await authService.login({ email, password });
   authService.storeToken(tokenResponse.access_token);
@@ -148,21 +160,26 @@ async function handleRegister({ name, email, password }) {
 }
 
 async function renderCurrentRoute() {
-  const currentPath = getCurrentPath();
+  const route = getCurrentRoute();
 
-  if (!state.currentUser && isProtectedPath(currentPath)) {
+  if (route.name === "unknown") {
+    navigate(state.currentUser ? ROUTE_PATHS.dashboard : ROUTE_PATHS.login);
+    return;
+  }
+
+  if (!state.currentUser && isProtectedRoute(route)) {
     navigate(ROUTE_PATHS.login);
     return;
   }
-  if (state.currentUser && isAuthPath(currentPath)) {
+  if (state.currentUser && isAuthRoute(route)) {
     navigate(ROUTE_PATHS.dashboard);
     return;
   }
 
-  renderShell(currentPath);
+  renderShell(route);
   const pageRoot = appElement.querySelector("#page-root");
 
-  if (currentPath === ROUTE_PATHS.login) {
+  if (route.name === "login") {
     mountLoginView(pageRoot, {
       onLogin: handleLogin,
       onNavigate: navigate,
@@ -170,7 +187,7 @@ async function renderCurrentRoute() {
     return;
   }
 
-  if (currentPath === ROUTE_PATHS.register) {
+  if (route.name === "register") {
     mountRegisterView(pageRoot, {
       onRegister: handleRegister,
       onNavigate: navigate,
@@ -178,21 +195,35 @@ async function renderCurrentRoute() {
     return;
   }
 
-  if (currentPath === ROUTE_PATHS.dashboard) {
+  if (route.name === "dashboard") {
     await mountDashboardView(pageRoot, {
       currentUser: state.currentUser,
       onNavigate: navigate,
-      loadIndexes: async () => {
-        const indexes = await indexService.listIndexes();
-        return indexes.filter((indexObj) => {
-          return !indexObj.user_id || indexObj.user_id === state.currentUser?.id;
-        });
-      },
+      loadIndexes: loadUserIndexes,
     });
     return;
   }
 
-  if (currentPath === ROUTE_PATHS.createIndex) {
+  if (route.name === "indexList") {
+    await mountIndexListView(pageRoot, {
+      loadIndexes: loadUserIndexes,
+      onNavigate: navigate,
+      onOpenIndex: (indexId) => navigate(buildIndexDetailPath(indexId)),
+    });
+    return;
+  }
+
+  if (route.name === "indexDetail") {
+    await mountIndexDetailView(pageRoot, {
+      indexId: route.params.indexId,
+      onNavigate: navigate,
+      loadIndexDetail: (indexId) => indexService.getIndex(indexId),
+      loadPerformance: (indexId) => indexService.getIndexPerformance(indexId),
+    });
+    return;
+  }
+
+  if (route.name === "createIndex") {
     await mountCreateIndexView(pageRoot, {
       loadAssets: () => indexService.listAvailableAssets(),
       onCreateIndex: ({ name, assets }) =>

@@ -247,6 +247,23 @@ a {
   gap: 10px;
 }
 
+.index-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.index-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.index-card-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
 .index-item {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -280,6 +297,73 @@ a {
   color: var(--text-muted);
 }
 
+.section-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.composition-list {
+  display: grid;
+  gap: 8px;
+}
+
+.composition-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.metric-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metric-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.metric-label {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 0.83rem;
+}
+
+.metric-value {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.chart-shell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-foot {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
 .loading {
   margin: 0;
   color: var(--text-muted);
@@ -292,6 +376,10 @@ a {
   }
 
   .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 }

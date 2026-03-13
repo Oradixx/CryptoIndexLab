@@ -52,6 +52,9 @@ The frontend now provides the first usable MVP flow:
 - Register page (`api1` `/register`)
 - Authenticated dashboard with list of saved indexes (`api2` `/indexes`)
 - Create-index page with asset/weight form validation (`api2` `/assets/available` + `/indexes`)
+- Dedicated index list view with quick summaries (`api2` `/indexes`)
+- Index detail view with composition and historical performance section (`api2` `/indexes/{index_id}` + `/indexes/{index_id}/performance`)
+- Simple built-in line chart (SVG) for demo-friendly performance visualization
 
 Authentication state is handled client-side with a stored bearer token.
 By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, so the browser can call backend services without extra CORS configuration.

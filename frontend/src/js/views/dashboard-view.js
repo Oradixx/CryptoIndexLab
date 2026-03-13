@@ -19,13 +19,13 @@ function renderIndexList(indexes) {
       const chips = indexObj.assets
         .map(
           (asset) =>
-            `<span class="asset-chip">${escapeHtml(asset.symbol)}: ${asset.weight.toFixed(2)}%</span>`
+            `<span class="asset-chip">${escapeHtml(asset.symbol)}: ${Number(asset.weight).toFixed(2)}%</span>`
         )
         .join("");
       return `
         <li class="index-item">
           <h3 class="index-item-title">${escapeHtml(indexObj.name)}</h3>
-          <p class="muted">Total weight: ${indexObj.total_weight.toFixed(2)}%</p>
+          <p class="muted">Total weight: ${Number(indexObj.total_weight).toFixed(2)}%</p>
           <div class="asset-chip-list">${chips}</div>
         </li>
       `;
@@ -46,6 +46,7 @@ export async function mountDashboardView(root, { currentUser, onNavigate, loadIn
       </div>
       <div class="button-row">
         <button class="button button-primary" type="button" data-create-index>Create new index</button>
+        <button class="button button-secondary" type="button" data-view-indexes>View saved indexes</button>
       </div>
       <div class="stack">
         <h3>Saved Indexes</h3>
@@ -58,6 +59,9 @@ export async function mountDashboardView(root, { currentUser, onNavigate, loadIn
 
   root.querySelector("[data-create-index]").addEventListener("click", () => {
     onNavigate(ROUTE_PATHS.createIndex);
+  });
+  root.querySelector("[data-view-indexes]").addEventListener("click", () => {
+    onNavigate(ROUTE_PATHS.indexList);
   });
 
   const loading = root.querySelector("[data-loading]");

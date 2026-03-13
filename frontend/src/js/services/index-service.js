@@ -33,4 +33,18 @@ export class IndexService {
     });
     return response?.indexes || [];
   }
+
+  async getIndex(indexId) {
+    return requestJson({
+      baseUrl: this.api2BaseUrl,
+      path: `/indexes/${encodeURIComponent(indexId)}`,
+    });
+  }
+
+  async getIndexPerformance(indexId) {
+    return requestJson({
+      baseUrl: this.api2BaseUrl,
+      path: `/indexes/${encodeURIComponent(indexId)}/performance`,
+    });
+  }
 }

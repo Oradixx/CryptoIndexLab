@@ -1,0 +1,86 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+  pull_request:
+
+jobs:
+  build-scan-push:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: docker.io
+      IMAGE_NAMESPACE_OVERRIDE: ${{ secrets.IMAGE_NAMESPACE }}
+      IMAGE_TAG_OVERRIDE: ${{ secrets.IMAGE_TAG }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve pipeline variables
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref_name="${GITHUB_REF_NAME:-${GITHUB_REF##*/}}"
+          namespace="${IMAGE_NAMESPACE_OVERRIDE:-${IMAGE_NAMESPACE:-${DOCKERHUB_USERNAME:-cryptoindexlab}}}"
+          image_tag="${IMAGE_TAG_OVERRIDE:-${IMAGE_TAG:-${GITHUB_SHA::7}}}"
+          push_images="false"
+
+          if [ "$ref_name" = "main" ] && [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+            push_images="true"
+          fi
+
+          {
+            echo "IMAGE_NAMESPACE=${namespace}"
+            echo "IMAGE_TAG=${image_tag}"
+            echo "PUSH_IMAGES=${push_images}"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx create --name cryptoindexlab-builder --use 2>/dev/null || docker buildx use cryptoindexlab-builder
+          docker buildx inspect --bootstrap
+
+      - name: Login to Docker Hub
+        if: env.PUSH_IMAGES == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+
+      - name: Build, scan and optionally push images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          services=("frontend" "api1" "api2")
+          for service in "${services[@]}"; do
+            image="${REGISTRY}/${IMAGE_NAMESPACE}/cryptoindexlab-${service}:${IMAGE_TAG}"
+            latest_image="${REGISTRY}/${IMAGE_NAMESPACE}/cryptoindexlab-${service}:latest"
+
+            echo "Building ${image}"
+            docker buildx build --load --tag "${image}" "./${service}"
+
+            echo "Scanning ${image} with Trivy"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy:0.58.1 image \
+              --exit-code 1 \
+              --severity MEDIUM,HIGH,CRITICAL \
+              --no-progress \
+              "${image}"
+
+            if [ "${PUSH_IMAGES}" = "true" ]; then
+              echo "Pushing ${image}"
+              docker push "${image}"
+              docker tag "${image}" "${latest_image}"
+              docker push "${latest_image}"
+            fi
+          done

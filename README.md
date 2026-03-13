@@ -123,3 +123,30 @@ The final goal is a deployable Docker-based microservices app that can be starte
 - Need a clean restart:
   - `docker compose down`
   - `docker compose up --build -d`
+
+## CI/CD (Gitea Actions)
+
+The project now uses Gitea Actions workflow `.gitea/workflows/ci.yaml` for CI/CD.
+
+- It builds Docker images for `frontend`, `api1`, and `api2`.
+- It runs Trivy image scans and fails the pipeline when vulnerabilities with severity `MEDIUM`, `HIGH`, or `CRITICAL` are found.
+- It pushes images to Docker Hub on `main` when Docker Hub credentials are configured.
+
+### Expected Gitea Secrets and Variables
+
+Required secrets for image push:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+Optional variables:
+
+- `IMAGE_NAMESPACE` (defaults to Docker Hub username, then `cryptoindexlab`)
+- `IMAGE_TAG` (defaults to short commit SHA)
+
+Optional secret overrides (if you prefer keeping values in secrets):
+
+- `IMAGE_NAMESPACE`
+- `IMAGE_TAG`
+
+If Docker Hub secrets are not present, the pipeline still runs build + Trivy scan, but skips image push.

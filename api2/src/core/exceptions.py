@@ -20,3 +20,15 @@ class UpstreamMarketDataTimeoutError(UpstreamMarketDataError):
 
 class MalformedMarketDataResponseError(UpstreamMarketDataError):
     pass
+
+
+class IndexPerformanceError(Exception):
+    pass
+
+
+class InvalidIndexCompositionError(IndexPerformanceError):
+    pass
+
+
+class InsufficientHistoricalDataError(IndexPerformanceError):
+    pass

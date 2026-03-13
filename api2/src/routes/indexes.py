@@ -1,7 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.core.dependencies import get_index_service
-from src.core.exceptions import DomainValidationError
+from src.core.dependencies import get_index_performance_service, get_index_service
+from src.core.exceptions import (
+    DomainValidationError,
+    InsufficientHistoricalDataError,
+    InvalidIndexCompositionError,
+    MalformedMarketDataResponseError,
+    UnsupportedSymbolError,
+    UpstreamMarketDataError,
+    UpstreamMarketDataTimeoutError,
+)
 from src.models.index import CryptoIndex
 from src.schemas.indexes import (
     CreateIndexRequest,
@@ -9,6 +17,8 @@ from src.schemas.indexes import (
     IndexListResponse,
     IndexResponse,
 )
+from src.schemas.performance import IndexPerformanceResponse
+from src.services.index_performance import IndexPerformanceService
 from src.services.index_service import IndexService
 
 router = APIRouter(tags=["indexes"])
@@ -56,6 +66,31 @@ def get_index(
         )
 
     return _to_index_response(index_obj, index_service)
+
+
+@router.get("/indexes/{index_id}/performance", response_model=IndexPerformanceResponse)
+def get_index_performance(
+    index_id: str,
+    index_performance_service: IndexPerformanceService = Depends(get_index_performance_service),
+) -> IndexPerformanceResponse:
+    try:
+        performance = index_performance_service.calculate_index_performance(index_id=index_id)
+    except (InvalidIndexCompositionError, InsufficientHistoricalDataError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UnsupportedSymbolError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UpstreamMarketDataTimeoutError as exc:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    except (UpstreamMarketDataError, MalformedMarketDataResponseError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if not performance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Index not found.",
+        )
+
+    return performance
 
 
 @router.post("/indexes", response_model=IndexResponse, status_code=status.HTTP_201_CREATED)

@@ -37,11 +37,12 @@ Passwords are hashed before storage, `/me` is protected with a simple bearer tok
 - `GET /indexes/{index_id}`
 - `POST /indexes`
 - `GET /market/history/{symbol}`
+- `GET /indexes/{index_id}/performance`
 
 Indexes and index assets are now persisted (`Index` + `IndexAsset` tables), while `/assets/available` remains a controlled internal list of supported symbols.
 `api2` can now fetch daily historical crypto prices (about 1 year) through a dedicated market-data service, with symbol mapping, response normalization, and lightweight in-memory caching for repeated requests.
 Supported market-history symbols include `BTC`, `ETH`, `SOL`, `XRP`, `DOGE` (plus `ADA` and `BNB`).
-This historical data endpoint is designed as a foundation for future custom index performance calculations.
+Saved indexes can now return a historical performance series (normalized base value, daily points, and simple return summary) to power future frontend charts.
 
 ## Isolation Rules (Target)
 

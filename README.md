@@ -110,6 +110,15 @@ Expected size impact: API runtime images stay leaner by excluding pip cache and 
 4. Open the app:
    - Frontend: `http://localhost:3000` (or `FRONTEND_PORT` if changed)
 
+### Frontend Hot Reload (Course Requirement)
+
+To work on frontend files without restarting the container, use the dev override with bind mount:
+
+- Start stack with frontend bind-mounted source:
+  - `docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build`
+- Edit files in `frontend/src/*`
+- Refresh browser (`F5`): changes are served immediately (no frontend container restart required)
+
 ### Exposed Services
 
 - Frontend (nginx): `localhost:${FRONTEND_PORT}` (default `3000`)

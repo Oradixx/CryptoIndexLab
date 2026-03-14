@@ -43,9 +43,20 @@ function renderIndexCards(indexes) {
           <h3 class="index-card-title">${escapeHtml(indexObj.name)}</h3>
           <p class="muted">Created: ${formatDate(indexObj.created_at)}</p>
           <p class="muted">Assets: ${escapeHtml(assetSummary)}</p>
-          <div class="button-row">
-            <button class="button button-secondary" type="button" data-open-index="${escapeHtml(indexObj.id)}">
-              Open detail
+          <div class="index-card-actions">
+            <button class="button button-secondary button-sm" type="button" data-open-index="${escapeHtml(indexObj.id)}">
+              Open
+            </button>
+            <button class="button button-secondary button-sm" type="button" data-edit-index="${escapeHtml(indexObj.id)}">
+              Edit
+            </button>
+            <button
+              class="button button-danger button-sm"
+              type="button"
+              data-delete-index="${escapeHtml(indexObj.id)}"
+              data-index-name="${escapeHtml(indexObj.name)}"
+            >
+              Delete
             </button>
           </div>
         </article>
@@ -54,18 +65,22 @@ function renderIndexCards(indexes) {
     .join("");
 }
 
-export async function mountIndexListView(root, { loadIndexes, onOpenIndex, onNavigate }) {
+export async function mountIndexListView(
+  root,
+  { loadIndexes, onOpenIndex, onNavigate, onEditIndex, onDeleteIndex }
+) {
   root.innerHTML = `
     <section class="panel stack">
       <div>
         <h2 class="page-title">Saved Indexes</h2>
-        <p class="page-subtitle">Browse all created indexes and open one in detail.</p>
+        <p class="page-subtitle">Open, edit, delete, or create indexes from this page.</p>
       </div>
       <div class="button-row">
         <button class="button button-primary" type="button" data-create-index>Create new index</button>
       </div>
-      <p class="loading" data-loading>Loading indexes...</p>
+      <div class="alert alert-success" data-success hidden></div>
       <div class="alert alert-error" data-error hidden></div>
+      <p class="loading" data-loading>Loading indexes...</p>
       <div data-empty hidden>
         <p class="muted">No index has been created yet.</p>
       </div>
@@ -78,28 +93,85 @@ export async function mountIndexListView(root, { loadIndexes, onOpenIndex, onNav
   });
 
   const loading = root.querySelector("[data-loading]");
+  const successBox = root.querySelector("[data-success]");
   const errorBox = root.querySelector("[data-error]");
   const emptyState = root.querySelector("[data-empty]");
   const grid = root.querySelector("[data-grid]");
+  let indexes = [];
 
-  try {
-    const indexes = await loadIndexes();
+  function clearMessages() {
+    successBox.hidden = true;
+    errorBox.hidden = true;
+  }
+
+  function renderGrid() {
     if (!indexes.length) {
+      grid.hidden = true;
       emptyState.hidden = false;
+      grid.innerHTML = "";
       return;
     }
 
+    emptyState.hidden = true;
     grid.innerHTML = renderIndexCards(indexes);
     grid.hidden = false;
-    const openButtons = grid.querySelectorAll("[data-open-index]");
-    openButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const indexId = button.getAttribute("data-open-index");
-        if (indexId) {
-          onOpenIndex(indexId);
-        }
-      });
-    });
+  }
+
+  grid.addEventListener("click", async (event) => {
+    const openButton = event.target.closest("[data-open-index]");
+    if (openButton) {
+      const indexId = openButton.getAttribute("data-open-index");
+      if (indexId && typeof onOpenIndex === "function") {
+        onOpenIndex(indexId);
+      }
+      return;
+    }
+
+    const editButton = event.target.closest("[data-edit-index]");
+    if (editButton) {
+      const indexId = editButton.getAttribute("data-edit-index");
+      if (indexId && typeof onEditIndex === "function") {
+        onEditIndex(indexId);
+      }
+      return;
+    }
+
+    const deleteButton = event.target.closest("[data-delete-index]");
+    if (!deleteButton) {
+      return;
+    }
+    clearMessages();
+
+    const indexId = deleteButton.getAttribute("data-delete-index");
+    const indexName = deleteButton.getAttribute("data-index-name") || "this index";
+    if (!indexId || typeof onDeleteIndex !== "function") {
+      return;
+    }
+
+    if (!window.confirm(`Delete "${indexName}" permanently?`)) {
+      return;
+    }
+
+    deleteButton.disabled = true;
+    try {
+      await onDeleteIndex(indexId);
+      indexes = indexes.filter((item) => item.id !== indexId);
+      renderGrid();
+      successBox.textContent = `Index "${indexName}" deleted.`;
+      successBox.hidden = false;
+    } catch (error) {
+      errorBox.textContent = error instanceof Error ? error.message : "Failed to delete index.";
+      errorBox.hidden = false;
+    } finally {
+      if (deleteButton.isConnected) {
+        deleteButton.disabled = false;
+      }
+    }
+  });
+
+  try {
+    indexes = await loadIndexes();
+    renderGrid();
   } catch (error) {
     errorBox.textContent = error instanceof Error ? error.message : "Failed to load indexes.";
     errorBox.hidden = false;

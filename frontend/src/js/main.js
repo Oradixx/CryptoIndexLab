@@ -18,7 +18,6 @@ import { mountLoginView } from "./views/login-view.js";
 import { mountRegisterView } from "./views/register-view.js";
 
 const appElement = document.querySelector("#app");
-
 const state = {
   currentUser: null,
   flashMessage: null,
@@ -59,8 +58,7 @@ function consumeFlashMessage() {
 
 function renderTopbar(route) {
   const loggedIn = Boolean(state.currentUser);
-  const indexesActive =
-    route.name === "indexList" || route.name === "indexDetail" || route.name === "indexEdit";
+  const showBackToList = route.name === "indexDetail" || route.name === "indexEdit";
 
   const authLinks = `
     <a class="nav-link ${route.name === "login" ? "active" : ""}" href="#${ROUTE_PATHS.login}">Login</a>
@@ -68,9 +66,10 @@ function renderTopbar(route) {
   `;
 
   const appLinks = `
+    ${showBackToList
+      ? `<a class="nav-link" href="#${ROUTE_PATHS.indexList}">Back to list</a>`
+      : ""}
     <a class="nav-link ${route.name === "dashboard" ? "active" : ""}" href="#${ROUTE_PATHS.dashboard}">Dashboard</a>
-    <a class="nav-link ${indexesActive ? "active" : ""}" href="#${ROUTE_PATHS.indexList}">Indexes</a>
-    <a class="nav-link ${route.name === "createIndex" ? "active" : ""}" href="#${ROUTE_PATHS.createIndex}">Create Index</a>
     <button type="button" class="nav-button" data-logout>Logout</button>
   `;
 
@@ -78,7 +77,6 @@ function renderTopbar(route) {
     <header class="topbar">
       <div class="brand">
         <h1 class="brand-title">CryptoIndexLab</h1>
-        <p class="brand-subtitle">MVP interface for auth and custom index tracking</p>
       </div>
       <nav class="nav-links">
         ${loggedIn ? appLinks : authLinks}
@@ -222,6 +220,7 @@ async function renderCurrentRoute() {
     await mountDashboardView(pageRoot, {
       currentUser: state.currentUser,
       onNavigate: navigate,
+      onOpenIndex: (indexId) => navigate(buildIndexDetailPath(indexId)),
       loadIndexes: loadUserIndexes,
     });
     return;
@@ -232,6 +231,9 @@ async function renderCurrentRoute() {
       loadIndexes: loadUserIndexes,
       onNavigate: navigate,
       onOpenIndex: (indexId) => navigate(buildIndexDetailPath(indexId)),
+      onEditIndex: (indexId) => navigate(buildIndexEditPath(indexId)),
+      onDeleteIndex: (indexId) =>
+        runProtectedApiCall(() => indexService.deleteIndex(indexId)),
     });
     return;
   }
@@ -244,9 +246,6 @@ async function renderCurrentRoute() {
         runProtectedApiCall(() => indexService.getIndex(indexId)),
       loadPerformance: (indexId) =>
         runProtectedApiCall(() => indexService.getIndexPerformance(indexId)),
-      onEditIndex: (indexId) => navigate(buildIndexEditPath(indexId)),
-      onDeleteIndex: (indexId) =>
-        runProtectedApiCall(() => indexService.deleteIndex(indexId)),
     });
     return;
   }

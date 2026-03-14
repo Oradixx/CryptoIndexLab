@@ -1,0 +1,4 @@
+services:
+  frontend:
+    volumes:
+      - ./frontend/src:/usr/share/nginx/html

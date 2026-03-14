@@ -23,10 +23,18 @@ function renderIndexList(indexes) {
         )
         .join("");
       return `
-        <li class="index-item">
-          <h3 class="index-item-title">${escapeHtml(indexObj.name)}</h3>
-          <p class="muted">Total weight: ${Number(indexObj.total_weight).toFixed(2)}%</p>
-          <div class="asset-chip-list">${chips}</div>
+        <li>
+          <article
+            class="index-item index-item-clickable"
+            data-open-index="${escapeHtml(indexObj.id)}"
+            role="button"
+            tabindex="0"
+            aria-label="Open ${escapeHtml(indexObj.name)}"
+          >
+            <h3 class="index-item-title">${escapeHtml(indexObj.name)}</h3>
+            <p class="muted">Total weight: ${Number(indexObj.total_weight).toFixed(2)}%</p>
+            <div class="asset-chip-list">${chips}</div>
+          </article>
         </li>
       `;
     })
@@ -35,7 +43,7 @@ function renderIndexList(indexes) {
   return `<ul class="index-list">${items}</ul>`;
 }
 
-export async function mountDashboardView(root, { currentUser, onNavigate, loadIndexes }) {
+export async function mountDashboardView(root, { currentUser, onNavigate, onOpenIndex, loadIndexes }) {
   const displayName = escapeHtml(currentUser.name || currentUser.email);
 
   root.innerHTML = `
@@ -50,6 +58,7 @@ export async function mountDashboardView(root, { currentUser, onNavigate, loadIn
       </div>
       <div class="stack">
         <h3>Saved Indexes</h3>
+        <p class="muted">Tip: click an index card to open detail instantly.</p>
         <p class="loading" data-loading>Loading indexes...</p>
         <div class="alert alert-error" data-error hidden></div>
         <div data-list></div>
@@ -71,6 +80,22 @@ export async function mountDashboardView(root, { currentUser, onNavigate, loadIn
   try {
     const indexes = await loadIndexes();
     listContainer.innerHTML = renderIndexList(indexes);
+    const openCards = listContainer.querySelectorAll("[data-open-index]");
+    openCards.forEach((card) => {
+      const open = () => {
+        const indexId = card.getAttribute("data-open-index");
+        if (indexId) {
+          onOpenIndex(indexId);
+        }
+      };
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
   } catch (error) {
     errorBox.textContent = error instanceof Error ? error.message : "Failed to load indexes.";
     errorBox.hidden = false;

@@ -3,20 +3,24 @@ name: CI/CD
 on:
   push:
     branches:
-      - main
-      - develop
-      - "feature/**"
+      - "**"
   pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: cryptoindexlab
 
 jobs:
-  build-scan-push:
+  build_scan_push:
     runs-on: ubuntu-latest
     env:
-      REGISTRY: docker.io
-      IMAGE_NAMESPACE_OVERRIDE: ${{ secrets.IMAGE_NAMESPACE }}
-      IMAGE_TAG_OVERRIDE: ${{ secrets.IMAGE_TAG }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      IMAGE_NAMESPACE_OVERRIDE: ${{ secrets.IMAGE_NAMESPACE }}
+      IMAGE_TAG_OVERRIDE: ${{ secrets.IMAGE_TAG }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,26 +30,39 @@ jobs:
         run: |
           set -euo pipefail
 
-          ref_name="${GITHUB_REF_NAME:-${GITHUB_REF##*/}}"
-          namespace="${IMAGE_NAMESPACE_OVERRIDE:-${IMAGE_NAMESPACE:-${DOCKERHUB_USERNAME:-cryptoindexlab}}}"
-          image_tag="${IMAGE_TAG_OVERRIDE:-${IMAGE_TAG:-${GITHUB_SHA::7}}}"
-          push_images="false"
+          ref_name="${GITEA_REF_NAME:-${GITHUB_REF_NAME:-}}"
+          if [ -z "${ref_name}" ]; then
+            ref_name="${GITEA_REF:-${GITHUB_REF:-}}"
+            ref_name="${ref_name##refs/heads/}"
+            ref_name="${ref_name##refs/pull/}"
+          fi
 
-          if [ "$ref_name" = "main" ] && [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+          sha="${GITEA_SHA:-${GITHUB_SHA:-}}"
+          if [ -z "${sha}" ]; then
+            sha="$(git rev-parse HEAD)"
+          fi
+
+          short_sha="${sha:0:7}"
+          namespace="${IMAGE_NAMESPACE_OVERRIDE:-${IMAGE_NAMESPACE:-${DOCKERHUB_USERNAME:-cryptoindexlab}}}"
+          image_tag="${IMAGE_TAG_OVERRIDE:-${IMAGE_TAG:-${short_sha}}}"
+
+          push_images="false"
+          if [ "${ref_name}" = "main" ] && [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
             push_images="true"
           fi
 
           {
+            echo "REF_NAME=${ref_name}"
             echo "IMAGE_NAMESPACE=${namespace}"
             echo "IMAGE_TAG=${image_tag}"
             echo "PUSH_IMAGES=${push_images}"
-          } >> "$GITHUB_ENV"
+          } >> "${GITHUB_ENV}"
 
       - name: Set up Docker Buildx
         shell: bash
         run: |
           set -euo pipefail
-          docker buildx create --name cryptoindexlab-builder --use 2>/dev/null || docker buildx use cryptoindexlab-builder
+          docker buildx create --name cryptoindexlab-builder --driver docker-container --use 2>/dev/null || docker buildx use cryptoindexlab-builder
           docker buildx inspect --bootstrap
 
       - name: Login to Docker Hub
@@ -55,30 +72,30 @@ jobs:
           set -euo pipefail
           echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
 
-      - name: Build, scan and optionally push images
+      - name: Build images and run Trivy scans
         shell: bash
         run: |
           set -euo pipefail
 
-          services=("frontend" "api1" "api2")
+          services=(frontend api1 api2)
+
           for service in "${services[@]}"; do
-            image="${REGISTRY}/${IMAGE_NAMESPACE}/cryptoindexlab-${service}:${IMAGE_TAG}"
-            latest_image="${REGISTRY}/${IMAGE_NAMESPACE}/cryptoindexlab-${service}:latest"
+            image="${REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_PREFIX}-${service}:${IMAGE_TAG}"
+            latest_image="${REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_PREFIX}-${service}:latest"
 
             echo "Building ${image}"
             docker buildx build --load --tag "${image}" "./${service}"
 
-            echo "Scanning ${image} with Trivy"
+            echo "Scanning ${image}"
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
               aquasec/trivy:0.58.1 image \
+              --no-progress \
               --exit-code 1 \
               --severity MEDIUM,HIGH,CRITICAL \
-              --no-progress \
               "${image}"
 
             if [ "${PUSH_IMAGES}" = "true" ]; then
-              echo "Pushing ${image}"
               docker push "${image}"
               docker tag "${image}" "${latest_image}"
               docker push "${latest_image}"

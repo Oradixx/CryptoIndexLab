@@ -126,27 +126,27 @@ The final goal is a deployable Docker-based microservices app that can be starte
 
 ## CI/CD (Gitea Actions)
 
-The project now uses Gitea Actions workflow `.gitea/workflows/ci.yaml` for CI/CD.
+The project uses `.gitea/workflows/ci.yaml` as the CI/CD pipeline.
 
-- It builds Docker images for `frontend`, `api1`, and `api2`.
-- It runs Trivy image scans and fails the pipeline when vulnerabilities with severity `MEDIUM`, `HIGH`, or `CRITICAL` are found.
-- It pushes images to Docker Hub on `main` when Docker Hub credentials are configured.
+- CI runs on push and pull request.
+- It builds Docker images for all microservices: `frontend`, `api1`, and `api2`.
+- It scans built images with Trivy and fails on `MEDIUM`, `HIGH`, or `CRITICAL` vulnerabilities.
+- It pushes images to Docker Hub only on the `main` branch when credentials are available.
 
-### Expected Gitea Secrets and Variables
+Image naming pattern:
 
-Required secrets for image push:
+- `docker.io/<namespace>/cryptoindexlab-frontend:<tag>`
+- `docker.io/<namespace>/cryptoindexlab-api1:<tag>`
+- `docker.io/<namespace>/cryptoindexlab-api2:<tag>`
+
+Required Gitea secrets for push:
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
-Optional variables:
+Optional configuration:
 
-- `IMAGE_NAMESPACE` (defaults to Docker Hub username, then `cryptoindexlab`)
-- `IMAGE_TAG` (defaults to short commit SHA)
+- `IMAGE_NAMESPACE` (secret or environment variable, defaults to Docker Hub username, then `cryptoindexlab`)
+- `IMAGE_TAG` (secret or environment variable, defaults to short commit SHA)
 
-Optional secret overrides (if you prefer keeping values in secrets):
-
-- `IMAGE_NAMESPACE`
-- `IMAGE_TAG`
-
-If Docker Hub secrets are not present, the pipeline still runs build + Trivy scan, but skips image push.
+Without Docker Hub credentials, the workflow still performs build + Trivy scan but skips image push.

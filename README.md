@@ -78,6 +78,26 @@ By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, 
 
 The final goal is a deployable Docker-based microservices app that can be started and tested by the professor with Docker Compose.
 
+## Docker Image Hardening
+
+To better match container best practices expected by the course, service Docker images were hardened:
+
+- Pinned base images:
+  - `frontend`: `nginxinc/nginx-unprivileged:1.27.5-alpine`
+  - `api1` / `api2`: `python:3.12.9-slim-bookworm`
+- Non-root execution in runtime images:
+  - `frontend` runs as `nginx` on internal port `8080`
+  - `api1` / `api2` run as a dedicated unprivileged `appuser`
+- Healthchecks are now defined inside each service Dockerfile (`frontend`, `api1`, `api2`) so health behavior is portable outside Compose as well.
+- `api1` and `api2` now use a readable multi-stage build:
+  - builder stage installs Python dependencies in a virtual environment
+  - runtime stage copies only runtime dependencies + application source
+- Compose remains compatible:
+  - external frontend access stays `localhost:${FRONTEND_PORT}` (default `3000`), mapped to container port `8080`
+  - `depends_on: condition: service_healthy` continues to work by using image-defined healthchecks.
+
+Expected size impact: API runtime images stay leaner by excluding pip cache and by keeping dependency installation isolated in the builder stage; exact final size depends on architecture and resolved wheel variants.
+
 ## Run Locally with Docker Compose
 
 1. Create your local environment file:

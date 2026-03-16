@@ -173,7 +173,8 @@ a {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 11px;
@@ -184,9 +185,15 @@ a {
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   outline: 2px solid rgba(49, 179, 169, 0.32);
   border-color: var(--accent);
+}
+
+.field textarea {
+  min-height: 86px;
+  resize: vertical;
 }
 
 .form-row {
@@ -297,10 +304,16 @@ a {
 
 .index-grid {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-.index-card,
+.index-card {
+  border: 1px solid rgba(48, 74, 102, 0.55);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(8, 14, 22, 0.28);
+}
+
 .index-item {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -320,14 +333,18 @@ a {
 .index-item-clickable:focus-visible {
   outline: none;
   border-color: #44739b;
-  transform: translateY(-2px);
-  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
 }
 
 .index-card-title,
 .index-item-title {
   margin: 0 0 8px;
   font-size: 1rem;
+}
+
+.index-card-description {
+  margin: 0 0 8px;
 }
 
 .index-card-actions {

@@ -34,19 +34,29 @@ function buildAssetSummary(assets) {
   return `${preview}, +${assets.length - 3} more`;
 }
 
+function buildDescription(description) {
+  const normalized = String(description || "").trim();
+  return normalized || "No description.";
+}
+
 function renderIndexCards(indexes) {
   return indexes
     .map((indexObj) => {
       const assetSummary = buildAssetSummary(indexObj.assets);
+      const description = buildDescription(indexObj.description);
       return `
-        <article class="index-card">
+        <article
+          class="index-card index-card-clickable"
+          data-open-index="${escapeHtml(indexObj.id)}"
+          role="button"
+          tabindex="0"
+          aria-label="Open ${escapeHtml(indexObj.name)}"
+        >
           <h3 class="index-card-title">${escapeHtml(indexObj.name)}</h3>
+          <p class="index-card-description muted">${escapeHtml(description)}</p>
           <p class="muted">Created: ${formatDate(indexObj.created_at)}</p>
           <p class="muted">Assets: ${escapeHtml(assetSummary)}</p>
           <div class="index-card-actions">
-            <button class="button button-secondary button-sm" type="button" data-open-index="${escapeHtml(indexObj.id)}">
-              Open
-            </button>
             <button class="button button-secondary button-sm" type="button" data-edit-index="${escapeHtml(indexObj.id)}">
               Edit
             </button>
@@ -70,10 +80,10 @@ export async function mountIndexListView(
   { loadIndexes, onOpenIndex, onNavigate, onEditIndex, onDeleteIndex }
 ) {
   root.innerHTML = `
-    <section class="panel stack">
+    <section class="panel panel-flat stack">
       <div>
         <h2 class="page-title">Saved Indexes</h2>
-        <p class="page-subtitle">Open, edit, delete, or create indexes from this page.</p>
+        <p class="page-subtitle">Click an index row to open it. Edit and delete stay available.</p>
       </div>
       <div class="button-row">
         <button class="button button-primary" type="button" data-create-index>Create new index</button>
@@ -118,15 +128,6 @@ export async function mountIndexListView(
   }
 
   grid.addEventListener("click", async (event) => {
-    const openButton = event.target.closest("[data-open-index]");
-    if (openButton) {
-      const indexId = openButton.getAttribute("data-open-index");
-      if (indexId && typeof onOpenIndex === "function") {
-        onOpenIndex(indexId);
-      }
-      return;
-    }
-
     const editButton = event.target.closest("[data-edit-index]");
     if (editButton) {
       const indexId = editButton.getAttribute("data-edit-index");
@@ -137,35 +138,65 @@ export async function mountIndexListView(
     }
 
     const deleteButton = event.target.closest("[data-delete-index]");
-    if (!deleteButton) {
-      return;
-    }
-    clearMessages();
+    if (deleteButton) {
+      clearMessages();
 
-    const indexId = deleteButton.getAttribute("data-delete-index");
-    const indexName = deleteButton.getAttribute("data-index-name") || "this index";
-    if (!indexId || typeof onDeleteIndex !== "function") {
-      return;
-    }
-
-    if (!window.confirm(`Delete "${indexName}" permanently?`)) {
-      return;
-    }
-
-    deleteButton.disabled = true;
-    try {
-      await onDeleteIndex(indexId);
-      indexes = indexes.filter((item) => item.id !== indexId);
-      renderGrid();
-      successBox.textContent = `Index "${indexName}" deleted.`;
-      successBox.hidden = false;
-    } catch (error) {
-      errorBox.textContent = error instanceof Error ? error.message : "Failed to delete index.";
-      errorBox.hidden = false;
-    } finally {
-      if (deleteButton.isConnected) {
-        deleteButton.disabled = false;
+      const indexId = deleteButton.getAttribute("data-delete-index");
+      const indexName = deleteButton.getAttribute("data-index-name") || "this index";
+      if (!indexId || typeof onDeleteIndex !== "function") {
+        return;
       }
+
+      if (!window.confirm(`Delete "${indexName}" permanently?`)) {
+        return;
+      }
+
+      deleteButton.disabled = true;
+      try {
+        await onDeleteIndex(indexId);
+        indexes = indexes.filter((item) => item.id !== indexId);
+        renderGrid();
+        successBox.textContent = `Index "${indexName}" deleted.`;
+        successBox.hidden = false;
+      } catch (error) {
+        errorBox.textContent = error instanceof Error ? error.message : "Failed to delete index.";
+        errorBox.hidden = false;
+      } finally {
+        if (deleteButton.isConnected) {
+          deleteButton.disabled = false;
+        }
+      }
+      return;
+    }
+
+    const openCard = event.target.closest("[data-open-index]");
+    if (!openCard) {
+      return;
+    }
+
+    const indexId = openCard.getAttribute("data-open-index");
+    if (indexId && typeof onOpenIndex === "function") {
+      onOpenIndex(indexId);
+    }
+  });
+
+  grid.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    const openCard = event.target.closest("[data-open-index]");
+    if (!openCard) {
+      return;
+    }
+    if (event.target.closest("[data-edit-index], [data-delete-index]")) {
+      return;
+    }
+
+    event.preventDefault();
+    const indexId = openCard.getAttribute("data-open-index");
+    if (indexId && typeof onOpenIndex === "function") {
+      onOpenIndex(indexId);
     }
   });
 

@@ -53,13 +53,19 @@ class IndexService:
     def create_index(
         self,
         name: str,
+        description: str | None,
         assets: list[tuple[str, float]],
         user_id: str,
     ) -> CryptoIndex:
         normalized_name = self._normalize_index_name(name)
+        normalized_description = self._normalize_index_description(description)
         normalized_user_id = self._normalize_user_id(user_id)
         validated_assets = self._validate_assets(assets)
-        created_index = CryptoIndex(name=normalized_name, user_id=normalized_user_id)
+        created_index = CryptoIndex(
+            name=normalized_name,
+            description=normalized_description,
+            user_id=normalized_user_id,
+        )
         created_index.assets.extend(validated_assets)
 
         self._db_session.add(created_index)
@@ -76,6 +82,7 @@ class IndexService:
         self,
         index_id: str,
         name: str,
+        description: str | None,
         assets: list[tuple[str, float]],
         user_id: str,
     ) -> CryptoIndex | None:
@@ -85,9 +92,11 @@ class IndexService:
             return None
 
         normalized_name = self._normalize_index_name(name)
+        normalized_description = self._normalize_index_description(description)
         validated_assets = self._validate_assets(assets)
 
         existing_index.name = normalized_name
+        existing_index.description = normalized_description
         existing_index.assets.clear()
         existing_index.assets.extend(validated_assets)
 
@@ -121,6 +130,17 @@ class IndexService:
         if not normalized_name:
             raise DomainValidationError("Index name is required.")
         return normalized_name
+
+    def _normalize_index_description(self, description: str | None) -> str | None:
+        if description is None:
+            return None
+
+        normalized_description = description.strip()
+        if not normalized_description:
+            return None
+        if len(normalized_description) > 500:
+            raise DomainValidationError("Index description must be 500 characters or less.")
+        return normalized_description
 
     def _validate_assets(self, assets: list[tuple[str, float]]) -> list[IndexAsset]:
         if not assets:

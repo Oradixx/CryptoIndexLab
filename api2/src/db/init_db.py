@@ -2,6 +2,8 @@ import logging
 import time
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.inspection import inspect
+from sqlalchemy.sql import text
 
 from src.core.config import settings
 from src.db.base import Base
@@ -16,6 +18,13 @@ def init_db() -> None:
     for attempt in range(1, settings.db_init_max_attempts + 1):
         try:
             Base.metadata.create_all(bind=engine)
+            with engine.begin() as connection:
+                inspector = inspect(connection)
+                index_columns = {column["name"] for column in inspector.get_columns("indexes")}
+                if "description" not in index_columns:
+                    connection.execute(
+                        text("ALTER TABLE indexes ADD COLUMN description VARCHAR(500)")
+                    )
             if attempt > 1:
                 logger.info(
                     "Database initialization succeeded on attempt %s/%s.",

@@ -44,6 +44,17 @@ export async function mountEditIndexView(
           <input id="index-name" name="name" type="text" maxlength="100" required>
         </div>
 
+        <div class="field">
+          <label for="index-description">Description (optional)</label>
+          <textarea
+            id="index-description"
+            name="description"
+            maxlength="500"
+            rows="3"
+            placeholder="What this index is for..."
+          ></textarea>
+        </div>
+
         <div class="stack">
           <h3>Assets and Weights</h3>
           <div class="stack" data-assets-container></div>
@@ -71,6 +82,7 @@ export async function mountEditIndexView(
   const assetsContainer = root.querySelector("[data-assets-container]");
   const totalWeightLabel = root.querySelector("[data-total-weight]");
   const nameInput = root.querySelector("#index-name");
+  const descriptionInput = root.querySelector("#index-description");
 
   let availableAssets = [];
 
@@ -140,7 +152,9 @@ export async function mountEditIndexView(
     event.preventDefault();
     clearMessages();
 
-    const indexName = String(new FormData(form).get("name") || "").trim();
+    const formData = new FormData(form);
+    const indexName = String(formData.get("name") || "").trim();
+    const indexDescription = String(formData.get("description") || "").trim();
     if (!indexName) {
       setError("Index name is required.");
       return;
@@ -186,7 +200,11 @@ export async function mountEditIndexView(
 
     submitButton.disabled = true;
     try {
-      await onUpdateIndex(indexId, { name: indexName, assets });
+      await onUpdateIndex(indexId, {
+        name: indexName,
+        description: indexDescription || null,
+        assets,
+      });
       successBox.textContent = "Index updated successfully.";
       successBox.hidden = false;
       setTimeout(() => {
@@ -208,6 +226,7 @@ export async function mountEditIndexView(
     }
 
     nameInput.value = indexDetail.name || "";
+    descriptionInput.value = indexDetail.description || "";
     const existingAssets = Array.isArray(indexDetail.assets) ? indexDetail.assets : [];
     assetsContainer.innerHTML = "";
     if (existingAssets.length) {

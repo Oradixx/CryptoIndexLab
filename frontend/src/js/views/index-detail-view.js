@@ -56,6 +56,11 @@ function formatNumber(value) {
   });
 }
 
+function buildDescription(description) {
+  const normalized = String(description || "").trim();
+  return normalized || "No description.";
+}
+
 function formatPercent(value) {
   const numeric = Number(value);
   const sign = numeric > 0 ? "+" : "";
@@ -990,6 +995,10 @@ function mountPerformanceExplorer(performanceRoot, performance) {
       },
       textColor: "#9cb0c7",
       fontFamily: "Space Grotesk, IBM Plex Sans, sans-serif",
+      attributionLogo: false,
+    },
+    watermark: {
+      visible: false,
     },
     grid: {
       vertLines: {
@@ -1003,7 +1012,7 @@ function mountPerformanceExplorer(performanceRoot, performance) {
       borderColor: "rgba(87, 111, 142, 0.4)",
       scaleMargins: {
         top: 0.08,
-        bottom: 0.2,
+        bottom: 0.08,
       },
     },
     timeScale: {
@@ -1109,8 +1118,10 @@ function mountPerformanceExplorer(performanceRoot, performance) {
       type: "volume",
     },
     priceScaleId: "",
+  });
+  volumeSeries.priceScale().applyOptions({
     scaleMargins: {
-      top: 0.82,
+      top: 0.95,
       bottom: 0,
     },
   });
@@ -1723,6 +1734,7 @@ export async function mountIndexDetailView(
     <div class="stack">
       <div>
         <h2 class="page-title">${escapeHtml(indexDetail.name)}</h2>
+        <p class="page-subtitle">${escapeHtml(buildDescription(indexDetail.description))}</p>
         <p class="page-subtitle">
           Created: ${formatDate(indexDetail.created_at)}
         </p>

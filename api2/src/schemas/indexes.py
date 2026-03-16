@@ -18,6 +18,7 @@ class IndexAssetInput(BaseModel):
 
 class CreateIndexRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
     assets: list[IndexAssetInput] = Field(min_length=1)
 
     @field_validator("name")
@@ -27,6 +28,14 @@ class CreateIndexRequest(BaseModel):
         if not normalized:
             raise ValueError("Index name is required.")
         return normalized
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
     @model_validator(mode="after")
     def validate_composition(self) -> "CreateIndexRequest":
@@ -56,6 +65,7 @@ class IndexAssetResponse(BaseModel):
 class IndexResponse(BaseModel):
     id: str
     name: str
+    description: str | None = None
     assets: list[IndexAssetResponse]
     total_weight: float
     user_id: str | None = None

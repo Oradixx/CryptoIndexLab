@@ -43,6 +43,7 @@ def _to_index_response(index: CryptoIndex, index_service: IndexService) -> Index
     return IndexResponse(
         id=index.id,
         name=index.name,
+        description=index.description,
         assets=response_assets,
         total_weight=total_weight,
         user_id=index.user_id,
@@ -121,6 +122,7 @@ def create_index(
     try:
         created_index = index_service.create_index(
             name=payload.name,
+            description=payload.description,
             assets=[(asset.symbol, asset.weight) for asset in payload.assets],
             user_id=current_user_id,
         )
@@ -141,6 +143,7 @@ def update_index(
         updated_index = index_service.update_index(
             index_id=index_id,
             name=payload.name,
+            description=payload.description,
             assets=[(asset.symbol, asset.weight) for asset in payload.assets],
             user_id=current_user_id,
         )

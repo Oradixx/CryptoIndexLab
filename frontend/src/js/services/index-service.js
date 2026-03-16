@@ -18,7 +18,7 @@ export class IndexService {
     return response?.assets || [];
   }
 
-  async createIndex({ name, assets }) {
+  async createIndex({ name, description, assets }) {
     return requestJson({
       baseUrl: this.api2BaseUrl,
       path: "/indexes",
@@ -26,6 +26,7 @@ export class IndexService {
       token: this._authToken(),
       body: {
         name,
+        description,
         assets,
       },
     });
@@ -56,7 +57,7 @@ export class IndexService {
     });
   }
 
-  async updateIndex(indexId, { name, assets }) {
+  async updateIndex(indexId, { name, description, assets }) {
     return requestJson({
       baseUrl: this.api2BaseUrl,
       path: `/indexes/${encodeURIComponent(indexId)}`,
@@ -64,6 +65,7 @@ export class IndexService {
       token: this._authToken(),
       body: {
         name,
+        description,
         assets,
       },
     });

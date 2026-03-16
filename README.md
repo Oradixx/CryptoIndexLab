@@ -87,16 +87,19 @@ To better match container best practices expected by the course, service Docker 
   - `api1` / `api2`: `python:3.12.9-slim-bookworm`
 - Non-root execution in runtime images:
   - `frontend` runs as `nginx` on internal port `8080`
-  - `api1` / `api2` run as a dedicated unprivileged `appuser`
+  - `api1` / `api2` run as a dedicated unprivileged `appuser` (fixed `uid=10001`)
 - Healthchecks are now defined inside each service Dockerfile (`frontend`, `api1`, `api2`) so health behavior is portable outside Compose as well.
 - `api1` and `api2` now use a readable multi-stage build:
   - builder stage installs Python dependencies in a virtual environment
   - runtime stage copies only runtime dependencies + application source
+- Smaller build contexts are enforced with service-level `.dockerignore` files (`frontend/`, `api1/`, `api2/`) so CI/build only sends files required for each image.
+- Backend dependency install now includes `pip check` during build to fail early on broken dependency trees.
+- Frontend image removes one extra layer by setting entrypoint script execute permission directly during `COPY`.
 - Compose remains compatible:
   - external frontend access stays `localhost:${FRONTEND_PORT}` (default `3000`), mapped to container port `8080`
   - `depends_on: condition: service_healthy` continues to work by using image-defined healthchecks.
 
-Expected size impact: API runtime images stay leaner by excluding pip cache and by keeping dependency installation isolated in the builder stage; exact final size depends on architecture and resolved wheel variants.
+Expected size impact: API runtime images stay leaner by excluding pip cache and by keeping dependency installation isolated in the builder stage; image layers are also slightly reduced in frontend, and Docker build contexts are significantly smaller due to `.dockerignore` filters (exact final image size still depends on architecture and resolved wheels).
 
 ## Run Locally with Docker Compose
 

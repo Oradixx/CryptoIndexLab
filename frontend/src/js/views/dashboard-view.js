@@ -9,6 +9,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function buildDescription(description) {
+  const normalized = String(description || "").trim();
+  return normalized || "No description.";
+}
+
 function renderIndexList(indexes) {
   if (!indexes.length) {
     return `<p class="muted">No indexes yet. Start by creating your first one.</p>`;
@@ -32,6 +37,7 @@ function renderIndexList(indexes) {
             aria-label="Open ${escapeHtml(indexObj.name)}"
           >
             <h3 class="index-item-title">${escapeHtml(indexObj.name)}</h3>
+            <p class="muted">${escapeHtml(buildDescription(indexObj.description))}</p>
             <p class="muted">Total weight: ${Number(indexObj.total_weight).toFixed(2)}%</p>
             <div class="asset-chip-list">${chips}</div>
           </article>

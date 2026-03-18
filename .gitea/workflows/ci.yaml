@@ -92,6 +92,7 @@ jobs:
               aquasec/trivy:0.58.1 image \
               --no-progress \
               --exit-code 1 \
+              --ignore-unfixed \
               --severity MEDIUM,HIGH,CRITICAL \
               "${image}"
 

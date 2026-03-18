@@ -13,7 +13,8 @@ RUN python -m venv "${VENV_PATH}"
 ENV PATH="${VENV_PATH}/bin:${PATH}"
 
 COPY requirements.txt .
-RUN pip install --requirement requirements.txt \
+RUN pip install --upgrade pip \
+    && pip install --requirement requirements.txt \
     && pip check
 
 FROM python:3.12.9-slim-bookworm AS runtime

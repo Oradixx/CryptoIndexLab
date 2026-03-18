@@ -25,7 +25,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN groupadd --gid 10001 appgroup \
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 appgroup \
     && useradd --uid 10001 --gid appgroup --home-dir /app --shell /usr/sbin/nologin appuser \
     && chown appuser:appgroup /app
 

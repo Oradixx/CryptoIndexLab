@@ -2,7 +2,8 @@ FROM nginxinc/nginx-unprivileged:1.27.5-alpine
 
 USER root
 
-RUN apk add --no-cache gettext
+RUN apk upgrade --no-cache \
+    && apk add --no-cache gettext
 
 WORKDIR /usr/share/nginx/html
 

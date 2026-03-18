@@ -57,6 +57,15 @@ export class IndexService {
     });
   }
 
+  async getMarketHistory(symbol) {
+    const normalizedSymbol = String(symbol || "").trim().toUpperCase();
+    return requestJson({
+      baseUrl: this.api2BaseUrl,
+      path: `/market/history/${encodeURIComponent(normalizedSymbol)}`,
+      token: this._authToken(),
+    });
+  }
+
   async updateIndex(indexId, { name, description, assets }) {
     return requestJson({
       baseUrl: this.api2BaseUrl,

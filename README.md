@@ -1,184 +1,337 @@
 # CryptoIndexLab
 
-CryptoIndexLab is a school microservices project to build a web app where users can create and monitor custom cryptocurrency indexes.
+A microservices web application where users create and monitor custom cryptocurrency indexes — weighted baskets of coins tracked over time with historical performance charts.
 
-## Problem Solved
+Built as a school project to learn containerization, service isolation, and Docker Compose orchestration.
 
-Most simple crypto tools only track single assets. CryptoIndexLab focuses on user-defined indexes (custom baskets of coins with weights) to support portfolio-style tracking and experimentation.
+## Features
 
-## Architecture Overview
+- **User accounts** — register, log in, and manage a personal session with JWT-based authentication.
+- **Custom indexes** — create named indexes composed of multiple crypto assets with custom weights (e.g. 50% BTC, 30% ETH, 20% SOL).
+- **Full CRUD** — edit index name, description, and composition; delete indexes you no longer need.
+- **Historical performance** — each index gets a daily performance series computed from real market data (CoinGecko API), displayed as an interactive chart.
+- **Technical indicators** — overlay SMA, EMA, RSI, MACD, and Bollinger Bands on the performance chart.
+- **Index comparison** — compare your indexes against each other or against individual cryptos (BTC, ETH, etc.) on a normalized base-100 chart.
+- **User isolation** — each user only sees and manages their own indexes.
+- **Dockerized stack** — the entire app runs with a single `docker compose up` command.
 
-- `frontend`: MVP web app (login, register, dashboard, create-index form) connected to backend APIs.
-- `api1`: users/authentication service (accounts, login, identity endpoints).
-- `api2`: crypto index business service (index creation and management logic).
-- `db1`: dedicated database for `api1`.
-- `db2`: dedicated database for `api2`.
+## Technology Stack
 
-The repository currently provides a clean microservices foundation. Authentication and crypto index business logic are being implemented incrementally.
+| Layer | Technology | Details |
+|-------|-----------|---------|
+| Frontend | Vanilla JavaScript (ES6 modules) | Single-page app with client-side routing |
+| Frontend server | Nginx 1.27.5 (unprivileged Alpine) | Serves static files and proxies API calls |
+| Charts | Lightweight Charts 4.2 | TradingView charting library |
+| Backend APIs | Python 3.12 + FastAPI | Two independent microservices |
+| Databases | PostgreSQL 16 (Alpine) | One dedicated instance per API |
+| Market data | CoinGecko API | Historical daily prices with in-memory cache |
+| Containerization | Docker + Docker Compose | Multi-stage builds, non-root users, healthchecks |
+| CI/CD | Gitea Actions | Build, Trivy vulnerability scan, Docker Hub push |
 
-## API1 Current Scope
+## Architecture
 
-`api1` now exposes a minimal FastAPI authentication service backed by its dedicated PostgreSQL database (`db1`):
+```mermaid
+graph TB
+    Browser([Browser])
 
-- `GET /health`
-- `POST /register`
-- `POST /login`
-- `GET /me`
+    subgraph Docker Compose
+        Frontend["frontend<br/><small>Nginx · port 3000</small>"]
 
-Passwords are hashed before storage, `/me` is protected with a simple bearer token mechanism, and the users table is auto-created at service startup (basic schema bootstrap before introducing migrations).
+        subgraph Authentication
+            API1["api1<br/><small>FastAPI · port 8001</small>"]
+            DB1[("db1<br/><small>PostgreSQL<br/>crypto_auth</small>")]
+        end
 
-## API2 Current Scope
+        subgraph Business Logic
+            API2["api2<br/><small>FastAPI · port 8002</small>"]
+            DB2[("db2<br/><small>PostgreSQL<br/>crypto_index</small>")]
+        end
+    end
 
-`api2` now exposes a FastAPI business service for custom crypto indexes backed by its dedicated PostgreSQL database (`db2`):
+    CoinGecko([CoinGecko API])
 
-- `GET /health`
-- `GET /assets/available`
-- `GET /indexes`
-- `GET /indexes/{index_id}`
-- `POST /indexes`
-- `PUT /indexes/{index_id}`
-- `DELETE /indexes/{index_id}`
-- `GET /market/history/{symbol}`
-- `GET /indexes/{index_id}/performance`
+    Browser -->|HTTP| Frontend
+    Frontend -->|/api1/*| API1
+    Frontend -->|/api2/*| API2
+    API1 -->|SQL| DB1
+    API2 -->|SQL| DB2
+    API2 -->|token validation| API1
+    API2 -->|market data| CoinGecko
+```
 
-Indexes and index assets are now persisted (`Index` + `IndexAsset` tables), while `/assets/available` remains a controlled internal list of supported symbols.
-Indexes are now user-owned: authenticated index endpoints return only the current user's resources and reject cross-user access.
-`api2` can now fetch daily historical crypto prices (about 1 year) through a dedicated market-data service, with symbol mapping, response normalization, and lightweight in-memory caching for repeated requests.
-Supported market-history symbols include `BTC`, `ETH`, `SOL`, `XRP`, `DOGE` (plus `ADA` and `BNB`).
-Saved indexes can now return a historical performance series (normalized base value, daily points, and simple return summary) to power future frontend charts.
-User-owned indexes now support full CRUD updates: owners can edit index name/composition and delete indexes, while cross-user edit/delete access is rejected.
-`api2` remains decoupled from `api1` database by validating bearer tokens through the `api1` identity endpoint.
+### Communication Rules
 
-## Frontend Current Scope
+The services follow strict separation — this is a key part of the project:
 
-The frontend now provides the first usable MVP flow:
+| Path | Allowed | How |
+|------|---------|-----|
+| frontend → api1 | Yes | Nginx reverse proxy (`/api1/*`) |
+| frontend → api2 | Yes | Nginx reverse proxy (`/api2/*`) |
+| api1 → db1 | Yes | Direct SQL connection (SQLAlchemy) |
+| api2 → db2 | Yes | Direct SQL connection (SQLAlchemy) |
+| api2 → api1 | Yes | HTTP call to `/me` for token validation |
+| api1 → db2 | **No** | api1 has no credentials or connection string for db2 |
+| api2 → db1 | **No** | api2 has no credentials or connection string for db1 |
+| db1 ↔ db2 | **No** | Databases have no awareness of each other |
 
-- Login page (`api1` `/login` + `/me`)
-- Register page (`api1` `/register`)
-- Authenticated dashboard with list of saved indexes (`api2` `/indexes`)
-- Create-index page with asset/weight form validation (`api2` `/assets/available` + `/indexes`)
-- Dedicated index list view with quick summaries (`api2` `/indexes`)
-- Index detail view with composition and historical performance section (`api2` `/indexes/{index_id}` + `/indexes/{index_id}/performance`)
-- Index edit flow to update name/assets/weights (`api2` `PUT /indexes/{index_id}`)
-- Index delete action with confirmation (`api2` `DELETE /indexes/{index_id}`)
-- Simple built-in line chart (SVG) for demo-friendly performance visualization
+Each API only receives the `DATABASE_URL` for its own database. There is no shared database, no shared schema, and no direct database-to-database link. Cross-service communication happens exclusively through HTTP APIs.
 
-Authentication state is handled client-side with a stored bearer token.
-Frontend sends authenticated requests to protected `api2` index endpoints so each user only sees and accesses their own indexes.
-By default, frontend nginx proxies `/api1/*` to `api1` and `/api2/*` to `api2`, so the browser can call backend services without extra CORS configuration.
+### Service Overview
 
-## Isolation Rules (Target)
+| Service | Role | Port |
+|---------|------|------|
+| `frontend` | SPA served by Nginx, proxies API calls to backends | 3000 |
+| `api1` | User registration, login, JWT token management | 8001 |
+| `api2` | Index CRUD, market data retrieval, performance calculation | 8002 |
+| `db1` | PostgreSQL database dedicated to api1 (users table) | internal |
+| `db2` | PostgreSQL database dedicated to api2 (indexes + assets tables) | internal |
 
-- `api1` writes only to `db1`.
-- `api2` writes only to `db2`.
-- Services communicate through API calls, not shared databases.
-- Databases remain isolated per backend service.
+## Getting Started
 
-## Deployment Goal
+### Prerequisites
 
-The final goal is a deployable Docker-based microservices app that can be started and tested by the professor with Docker Compose.
+- [Docker](https://www.docker.com/) and Docker Compose (included with Docker Desktop)
+- Git
 
-## Docker Image Hardening
+### Installation
 
-To better match container best practices expected by the course, service Docker images were hardened:
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd CryptoIndexLab
 
-- Pinned base images:
-  - `frontend`: `nginxinc/nginx-unprivileged:1.27.5-alpine`
-  - `api1` / `api2`: `python:3.12.9-slim-bookworm`
-- Non-root execution in runtime images:
-  - `frontend` runs as `nginx` on internal port `8080`
-  - `api1` / `api2` run as a dedicated unprivileged `appuser` (fixed `uid=10001`)
-- Healthchecks are now defined inside each service Dockerfile (`frontend`, `api1`, `api2`) so health behavior is portable outside Compose as well.
-- `api1` and `api2` now use a readable multi-stage build:
-  - builder stage installs Python dependencies in a virtual environment
-  - runtime stage copies only runtime dependencies + application source
-- Smaller build contexts are enforced with service-level `.dockerignore` files (`frontend/`, `api1/`, `api2/`) so CI/build only sends files required for each image.
-- Backend dependency install now includes `pip check` during build to fail early on broken dependency trees.
-- Frontend image removes one extra layer by setting entrypoint script execute permission directly during `COPY`.
-- Compose remains compatible:
-  - external frontend access stays `localhost:${FRONTEND_PORT}` (default `3000`), mapped to container port `8080`
-  - `depends_on: condition: service_healthy` continues to work by using image-defined healthchecks.
+# 2. Create your environment file
+cp .env.example .env          # Linux / macOS
+Copy-Item .env.example .env   # PowerShell (Windows)
 
-Expected size impact: API runtime images stay leaner by excluding pip cache and by keeping dependency installation isolated in the builder stage; image layers are also slightly reduced in frontend, and Docker build contexts are significantly smaller due to `.dockerignore` filters (exact final image size still depends on architecture and resolved wheels).
+# 3. Start the full stack
+docker compose up --build -d
 
-## Run Locally with Docker Compose
+# 4. Wait for all services to be healthy
+docker compose ps
+```
 
-1. Create your local environment file:
-   - `cp .env.example .env` (Linux/macOS)
-   - `Copy-Item .env.example .env` (PowerShell)
-2. Start the full stack:
-   - `docker compose up --build -d`
-3. Check service status and health:
-   - `docker compose ps`
-4. Open the app:
-   - Frontend: `http://localhost:3000` (or `FRONTEND_PORT` if changed)
+Once all services show `healthy`, open **http://localhost:3000** in your browser.
 
-### Frontend Hot Reload (Course Requirement)
+### Frontend Hot Reload (Development)
 
-To work on frontend files without restarting the container, use the dev override with bind mount:
+To edit frontend files without rebuilding the container:
 
-- Start stack with frontend bind-mounted source:
-  - `docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build`
-- Edit files in `frontend/src/*`
-- Refresh browser (`F5`): changes are served immediately (no frontend container restart required)
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build
+```
 
-### Exposed Services
+This bind-mounts `frontend/src/` into the Nginx container. Edit files locally and refresh the browser to see changes.
 
-- Frontend (nginx): `localhost:${FRONTEND_PORT}` (default `3000`)
-- API1 (auth): `localhost:${API1_PORT}` (default `8001`)
-- API2 (index business): `localhost:${API2_PORT}` (default `8002`)
-- PostgreSQL databases are internal to Docker network and persisted with named volumes:
-  - `db1-data` for `api1`
-  - `db2-data` for `api2`
+### Stopping
 
-### Service Relationships
+```bash
+docker compose down            # stops containers, keeps database volumes
+docker compose down -v         # stops containers AND deletes database volumes
+```
 
-- `frontend` calls `api1` and `api2` through nginx proxy routes (`/api1/*`, `/api2/*`).
-- `api1` only connects to `db1`.
-- `api2` only connects to `db2` for persistence and calls `api1` `/me` to validate bearer tokens.
-- No backend service accesses the other backend's database.
+## Docker Orchestration
 
-### Environment Variables
+The stack is defined in `docker-compose.yaml` and includes 5 services on a single bridge network (`cryptoindexlab-net`).
 
-- `.env.example` is aligned with compose defaults and Docker-internal hostnames (`api1`, `api2`, `db1`, `db2`).
-- `FRONTEND_PUBLIC_API1_URL` and `FRONTEND_PUBLIC_API2_URL` are browser-facing URLs (default proxied paths, not direct container hosts).
-- `API1_DB_INIT_MAX_ATTEMPTS` / `API2_DB_INIT_MAX_ATTEMPTS` and corresponding retry delay variables control lightweight DB init retries at startup.
+**Startup order** is managed with healthchecks:
+1. `db1` and `db2` start first (PostgreSQL readiness check via `pg_isready`)
+2. `api1` starts after `db1` is healthy
+3. `api2` starts after both `db2` and `api1` are healthy
+4. `frontend` starts after both `api1` and `api2` are healthy
 
-## Troubleshooting
+**Persistence**: database data is stored in named Docker volumes (`db1-data`, `db2-data`) so data survives container restarts.
 
-- Docker engine not running (Windows named pipe error):
-  - Start Docker Desktop, wait until it is fully running, then retry `docker compose up --build -d`.
-- Services still starting:
-  - Run `docker compose ps` and wait until healthchecks are `healthy`.
-- A backend fails to start:
-  - Inspect logs with `docker compose logs api1` or `docker compose logs api2`.
-- Need a clean restart:
-  - `docker compose down`
-  - `docker compose up --build -d`
+**Image hardening**:
+- Pinned base images (no `latest` tags)
+- Multi-stage builds for Python APIs (builder + lean runtime)
+- Non-root execution: Nginx runs as `nginx` user, APIs run as `appuser` (uid 10001)
+- Healthchecks defined in each Dockerfile for portability
+- Service-level `.dockerignore` files to minimize build contexts
+- `pip check` during build to catch broken dependencies early
 
-## CI/CD (Gitea Actions)
+## Environment Variables
 
-The project uses `.gitea/workflows/ci.yaml` as the CI/CD pipeline.
+All variables are defined in `.env.example` with sensible defaults. Copy it to `.env` before running.
 
-- CI runs on push and pull request.
-- It builds Docker images for all microservices: `frontend`, `api1`, and `api2`.
-- It scans built images with Trivy and fails on `MEDIUM`, `HIGH`, or `CRITICAL` vulnerabilities.
-- It pushes images to Docker Hub only on the `main` branch when credentials are available.
+### Frontend
 
-Image naming pattern:
+| Variable | Service | Description | Default |
+|----------|---------|-------------|---------|
+| `FRONTEND_PORT` | frontend | Host port for the web UI | `3000` |
+| `FRONTEND_PUBLIC_API1_URL` | frontend | Browser-facing URL for api1 (proxied by Nginx) | `/api1` |
+| `FRONTEND_PUBLIC_API2_URL` | frontend | Browser-facing URL for api2 (proxied by Nginx) | `/api2` |
 
-- `docker.io/<namespace>/cryptoindexlab-frontend:<tag>`
-- `docker.io/<namespace>/cryptoindexlab-api1:<tag>`
-- `docker.io/<namespace>/cryptoindexlab-api2:<tag>`
+### API1 — Authentication Service
 
-Required Gitea secrets for push:
+| Variable | Service | Description | Default |
+|----------|---------|-------------|---------|
+| `API1_PORT` | api1 | Host port for the auth API | `8001` |
+| `API1_LOG_LEVEL` | api1 | Logging level | `info` |
+| `API1_JWT_SECRET` | api1 | Secret key for signing tokens | `change_me_for_dev_only` |
+| `API1_TOKEN_TTL_SECONDS` | api1 | Token expiration time | `3600` |
+| `API1_DATABASE_URL` | api1 | PostgreSQL connection string for db1 | `postgresql+psycopg2://crypto_user:crypto_pass@db1:5432/crypto_auth` |
+| `API1_DB_INIT_MAX_ATTEMPTS` | api1 | Max retries for DB connection at startup | `10` |
+| `API1_DB_INIT_RETRY_DELAY_SECONDS` | api1 | Delay between DB init retries | `2` |
 
+### API2 — Crypto Index Service
+
+| Variable | Service | Description | Default |
+|----------|---------|-------------|---------|
+| `API2_PORT` | api2 | Host port for the index API | `8002` |
+| `API2_LOG_LEVEL` | api2 | Logging level | `info` |
+| `API2_DATABASE_URL` | api2 | PostgreSQL connection string for db2 | `postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index` |
+| `API2_DB_INIT_MAX_ATTEMPTS` | api2 | Max retries for DB connection at startup | `10` |
+| `API2_DB_INIT_RETRY_DELAY_SECONDS` | api2 | Delay between DB init retries | `2` |
+| `API2_MARKET_DATA_BASE_URL` | api2 | CoinGecko API base URL | `https://api.coingecko.com/api/v3` |
+| `API2_MARKET_DATA_TIMEOUT_SECONDS` | api2 | Timeout for CoinGecko requests | `10` |
+| `API2_MARKET_DATA_CURRENCY` | api2 | Currency for price data | `usd` |
+| `API2_MARKET_DATA_DAYS` | api2 | Days of historical data to fetch | `365` |
+| `API2_MARKET_DATA_CACHE_TTL_SECONDS` | api2 | Cache duration for market data | `300` |
+| `API2_MARKET_DATA_API_KEY` | api2 | Optional CoinGecko API key for higher rate limits | *(empty)* |
+| `API2_AUTH_API1_ME_URL` | api2 | Internal URL to validate tokens via api1 | `http://api1:8001/me` |
+| `API2_AUTH_TIMEOUT_SECONDS` | api2 | Timeout for token validation calls | `5` |
+
+### Databases
+
+| Variable | Service | Description | Default |
+|----------|---------|-------------|---------|
+| `DB1_NAME` | db1 | Database name for api1 | `crypto_auth` |
+| `DB1_USER` | db1 | Database user for api1 | `crypto_user` |
+| `DB1_PASSWORD` | db1 | Database password for api1 | `crypto_pass` |
+| `DB2_NAME` | db2 | Database name for api2 | `crypto_index` |
+| `DB2_USER` | db2 | Database user for api2 | `crypto_user` |
+| `DB2_PASSWORD` | db2 | Database password for api2 | `crypto_pass` |
+
+> **Note**: Inside Docker, services use internal hostnames (`api1`, `api2`, `db1`, `db2`), not `localhost`. The `FRONTEND_PUBLIC_*` URLs are browser-facing paths proxied by Nginx.
+
+## API Endpoints
+
+### API1 — Authentication (`/api1`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/health` | Health check | No |
+| POST | `/register` | Create a new user account | No |
+| POST | `/login` | Log in and receive a bearer token | No |
+| GET | `/me` | Get current user info | Yes |
+
+### API2 — Crypto Indexes (`/api2`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/health` | Health check | No |
+| GET | `/assets/available` | List supported crypto symbols | Yes |
+| GET | `/indexes` | List current user's indexes | Yes |
+| POST | `/indexes` | Create a new index | Yes |
+| GET | `/indexes/{id}` | Get index details with composition | Yes |
+| PUT | `/indexes/{id}` | Update index name/description/assets | Yes |
+| DELETE | `/indexes/{id}` | Delete an index | Yes |
+| GET | `/indexes/{id}/performance` | Get historical performance series | Yes |
+| GET | `/market/history/{symbol}` | Get daily price history for a crypto | Yes |
+
+## Demo Walkthrough
+
+Here is the typical user flow to demonstrate the application:
+
+1. **Register** — go to the register page, enter an email, name, and password. The account is created via api1.
+
+2. **Log in** — use your credentials on the login page. A JWT token is stored in the browser for authenticated requests.
+
+3. **Create an index** — from the dashboard, open the create form. Pick a name (e.g. "My Top 3"), optionally add a description, then add assets with weights:
+   - BTC — 50%
+   - ETH — 30%
+   - SOL — 20%
+   - Weights must add up to 100%.
+
+4. **View your indexes** — the dashboard lists all your saved indexes with a quick summary of their composition.
+
+5. **Inspect performance** — click on an index to see its detail page:
+   - Composition breakdown (assets and weights)
+   - Historical performance chart computed from real CoinGecko data
+   - Toggle technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
+   - Compare with other indexes or individual cryptos on a normalized chart
+
+6. **Edit an index** — update the name, description, or change the asset allocation.
+
+7. **Delete an index** — remove an index you no longer want (with confirmation).
+
+> **Screenshots**: demo screenshots will be added to `docs/screenshots/` before the final presentation.
+
+## CI/CD
+
+The project uses Gitea Actions (`.gitea/workflows/ci.yaml`).
+
+**Pipeline steps**:
+1. Build Docker images for `frontend`, `api1`, and `api2`
+2. Scan each image with [Trivy](https://trivy.dev/) — fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
+3. Push images to Docker Hub (only on `main` branch with credentials)
+
+**Image naming**: `docker.io/<namespace>/cryptoindexlab-<service>:<tag>`
+
+**Required Gitea secrets** for Docker Hub push:
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
-Optional configuration:
+Without credentials, the pipeline still builds and scans but skips the push step.
 
-- `IMAGE_NAMESPACE` (secret or environment variable, defaults to Docker Hub username, then `cryptoindexlab`)
-- `IMAGE_TAG` (secret or environment variable, defaults to short commit SHA)
+## Troubleshooting
 
-Without Docker Hub credentials, the workflow still performs build + Trivy scan but skips image push.
+| Problem | Solution |
+|---------|----------|
+| Docker engine not running (Windows named pipe error) | Start Docker Desktop and wait until it's fully ready, then retry |
+| Services not healthy yet | Run `docker compose ps` and wait — healthchecks take a few seconds |
+| A backend fails to start | Check logs: `docker compose logs api1` or `docker compose logs api2` |
+| Database connection errors | Make sure `.env` exists and matches `.env.example` defaults |
+| CoinGecko rate limiting | Add a free API key in `API2_MARKET_DATA_API_KEY` or wait a few minutes |
+| Need a fresh start | `docker compose down -v` then `docker compose up --build -d` |
+| Port conflict | Change `FRONTEND_PORT`, `API1_PORT`, or `API2_PORT` in `.env` |
+
+## Project Structure
+
+```
+CryptoIndexLab/
+├── frontend/                   # Nginx + vanilla JS single-page app
+│   ├── src/
+│   │   ├── index.html
+│   │   ├── styles.css
+│   │   ├── js/
+│   │   │   ├── main.js         # App init, routing, state
+│   │   │   ├── router.js       # Client-side route definitions
+│   │   │   ├── services/       # API clients (auth, indexes, session)
+│   │   │   └── views/          # View components (login, dashboard, etc.)
+│   │   └── vendor/             # Third-party libs (Lightweight Charts)
+│   ├── nginx/default.conf      # Nginx config with API proxying
+│   └── Dockerfile
+├── api1/                       # Authentication microservice
+│   ├── src/
+│   │   ├── main.py
+│   │   ├── core/               # Config, security, dependencies
+│   │   ├── db/                 # Database setup
+│   │   ├── models/             # SQLAlchemy models (User)
+│   │   ├── routes/             # FastAPI endpoints
+│   │   ├── schemas/            # Pydantic request/response schemas
+│   │   └── services/           # Business logic (AuthService)
+│   └── Dockerfile
+├── api2/                       # Crypto index microservice
+│   ├── src/
+│   │   ├── main.py
+│   │   ├── core/               # Config, symbol mapping, dependencies
+│   │   ├── db/                 # Database setup
+│   │   ├── models/             # SQLAlchemy models (Index, IndexAsset)
+│   │   ├── routes/             # FastAPI endpoints
+│   │   ├── schemas/            # Pydantic schemas
+│   │   └── services/           # Business logic + CoinGecko provider
+│   └── Dockerfile
+├── docs/                       # Additional documentation
+│   └── architecture.md
+├── docker-compose.yaml         # Production-like stack definition
+├── docker-compose.dev.yaml     # Dev override (frontend hot reload)
+├── .env.example                # Environment variable template
+├── .gitea/workflows/ci.yaml    # CI/CD pipeline
+└── AUTHORS.md                  # Team members
+```
+
+## Authors
+
+See [AUTHORS.md](AUTHORS.md).

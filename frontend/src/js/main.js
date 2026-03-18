@@ -246,6 +246,9 @@ async function renderCurrentRoute() {
         runProtectedApiCall(() => indexService.getIndex(indexId)),
       loadPerformance: (indexId) =>
         runProtectedApiCall(() => indexService.getIndexPerformance(indexId)),
+      loadIndexes: loadUserIndexes,
+      loadMarketHistory: (symbol) =>
+        runProtectedApiCall(() => indexService.getMarketHistory(symbol)),
     });
     return;
   }
@@ -266,13 +269,18 @@ async function renderCurrentRoute() {
   if (route.name === "createIndex") {
     await mountCreateIndexView(pageRoot, {
       loadAssets: () => indexService.listAvailableAssets(),
-      onCreateIndex: ({ name, assets }) =>
+      onCreateIndex: ({ name, description, assets }) =>
         runProtectedApiCall(() =>
           indexService.createIndex({
             name,
+            description,
             assets,
           })
         ),
+      onCreated: (createdIndex) => {
+        setFlashMessage("success", `Index "${createdIndex.name}" created.`);
+        navigate(ROUTE_PATHS.dashboard);
+      },
     });
   }
 }

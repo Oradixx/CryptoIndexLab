@@ -23,7 +23,7 @@ function parseWeight(rawValue) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-export async function mountCreateIndexView(root, { onCreateIndex, loadAssets }) {
+export async function mountCreateIndexView(root, { onCreateIndex, loadAssets, onCreated }) {
   root.innerHTML = `
     <section class="panel stack">
       <h2 class="page-title">Create Index</h2>
@@ -192,6 +192,12 @@ export async function mountCreateIndexView(root, { onCreateIndex, loadAssets }) 
         description: indexDescription || null,
         assets,
       });
+
+      if (typeof onCreated === "function") {
+        onCreated(createdIndex);
+        return;
+      }
+
       successBox.textContent = `Index created successfully (${createdIndex.id}).`;
       successBox.hidden = false;
       form.reset();

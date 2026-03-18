@@ -81,6 +81,49 @@ function normalizePoints(points) {
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
 }
 
+function normalizeMarketPoints(points) {
+  if (!Array.isArray(points)) {
+    return [];
+  }
+
+  return points
+    .map((point) => ({
+      date: String(point.date || ""),
+      value: Number(point.price),
+    }))
+    .filter((point) => point.date && Number.isFinite(point.value))
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+}
+
+function normalizeSeriesToBase(points) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return [];
+  }
+
+  const first = Number(points[0].value);
+  if (!Number.isFinite(first) || first <= 0) {
+    return [];
+  }
+
+  return points
+    .map((point) => {
+      const value = Number(point.value);
+      if (!Number.isFinite(value) || value < 0) {
+        return null;
+      }
+      return {
+        time: point.date,
+        value: Number(((value / first) * 100).toFixed(4)),
+      };
+    })
+    .filter(Boolean);
+}
+
+function getComparisonColor(index) {
+  const palette = ["#f97316", "#a78bfa", "#22d3ee", "#fb7185", "#84cc16", "#f59e0b", "#60a5fa"];
+  return palette[index % palette.length];
+}
+
 function normalizeTimeKey(value) {
   if (!value) {
     return null;
@@ -781,7 +824,7 @@ function renderCandleDetails(candle) {
   `;
 }
 
-function mountPerformanceExplorer(performanceRoot, performance) {
+function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig = {}) {
   const LightweightCharts = window.LightweightCharts;
   if (!LightweightCharts || typeof LightweightCharts.createChart !== "function") {
     performanceRoot.innerHTML = `
@@ -873,11 +916,22 @@ function mountPerformanceExplorer(performanceRoot, performance) {
     candleByTime: new Map(),
     lastCandle: null,
   };
+  const {
+    currentIndexId = null,
+    currentIndexName = "Current Index",
+    loadIndexes = null,
+    loadPerformance = null,
+    loadMarketHistory = null,
+  } = comparisonConfig;
   const modalState = {
     position: null,
     pointerId: null,
     offsetX: 0,
     offsetY: 0,
+  };
+  const comparisonState = {
+    items: new Map(),
+    indexes: [],
   };
 
   performanceRoot.innerHTML = `
@@ -918,6 +972,26 @@ function mountPerformanceExplorer(performanceRoot, performance) {
         </div>
         <div class="tv-chart-host" data-chart-host></div>
       </div>
+      <section class="comparison-panel stack" data-comparison-panel>
+        <div class="chart-controls comparison-controls">
+          <div class="control-cluster control-cluster-grow">
+            <p class="control-label">Compare With Other Indexes</p>
+            <div class="control-buttons comparison-row">
+              <select class="compare-select" data-compare-index-select></select>
+              <button class="button button-secondary" type="button" data-compare-index-add>Add index</button>
+            </div>
+          </div>
+          <div class="control-cluster control-cluster-grow">
+            <p class="control-label">Compare With Crypto</p>
+            <div class="control-buttons comparison-row">
+              <input class="compare-input" type="text" maxlength="10" placeholder="BTC, ETH..." data-compare-crypto-input>
+              <button class="button button-secondary" type="button" data-compare-crypto-add>Add crypto</button>
+            </div>
+          </div>
+        </div>
+        <div class="asset-chip-list comparison-chip-list" data-compare-chip-list></div>
+        <div class="alert alert-error" data-compare-error hidden></div>
+      </section>
       <div class="insight-strip">
         <article class="insight-inline" data-candle-details></article>
         <article class="insight-inline" data-window-stats></article>
@@ -938,6 +1012,13 @@ function mountPerformanceExplorer(performanceRoot, performance) {
   const indicatorListNode = performanceRoot.querySelector("[data-indicator-list]");
   const indicatorModal = performanceRoot.querySelector("[data-indicator-modal]");
   const indicatorDetailNode = performanceRoot.querySelector("[data-indicator-detail]");
+  const comparisonPanel = performanceRoot.querySelector("[data-comparison-panel]");
+  const compareIndexSelect = performanceRoot.querySelector("[data-compare-index-select]");
+  const compareIndexAddButton = performanceRoot.querySelector("[data-compare-index-add]");
+  const compareCryptoInput = performanceRoot.querySelector("[data-compare-crypto-input]");
+  const compareCryptoAddButton = performanceRoot.querySelector("[data-compare-crypto-add]");
+  const compareChipList = performanceRoot.querySelector("[data-compare-chip-list]");
+  const compareErrorNode = performanceRoot.querySelector("[data-compare-error]");
 
   function getIndicatorDetailWindow() {
     return indicatorDetailNode.querySelector(".indicator-detail-window");
@@ -1125,6 +1206,17 @@ function mountPerformanceExplorer(performanceRoot, performance) {
       bottom: 0,
     },
   });
+  const baseComparisonSeriesData = normalizeSeriesToBase(rawPoints);
+  const comparisonBaseSeries = chart.addLineSeries({
+    color: "#67b6ff",
+    lineWidth: 2,
+    lineStyle: 0,
+    priceLineVisible: false,
+    lastValueVisible: true,
+    crosshairMarkerVisible: false,
+    visible: false,
+  });
+  comparisonBaseSeries.setData(baseComparisonSeriesData);
 
   const indicatorSeriesMap = {
     sma20: [sma20Series],
@@ -1134,6 +1226,71 @@ function mountPerformanceExplorer(performanceRoot, performance) {
     ema50: [ema50Series],
     bb20: [bbUpperSeries, bbLowerSeries],
   };
+
+  function setCompareError(message) {
+    compareErrorNode.textContent = message;
+    compareErrorNode.hidden = false;
+  }
+
+  function clearCompareError() {
+    compareErrorNode.hidden = true;
+  }
+
+  function updateComparisonBaseVisibility() {
+    comparisonBaseSeries.applyOptions({ visible: comparisonState.items.size > 0 });
+  }
+
+  function renderComparisonChips() {
+    if (!comparisonState.items.size) {
+      compareChipList.innerHTML = `<p class="muted">No comparison active.</p>`;
+      updateComparisonBaseVisibility();
+      return;
+    }
+
+    const chips = Array.from(comparisonState.items.values())
+      .map(
+        (item) => `
+          <span class="asset-chip compare-chip" style="border-color:${item.color};">
+            <span class="compare-chip-dot" style="background:${item.color};"></span>
+            ${escapeHtml(item.label)}
+            <button class="compare-chip-remove" type="button" data-compare-remove="${escapeHtml(item.key)}">x</button>
+          </span>
+        `
+      )
+      .join("");
+    compareChipList.innerHTML = chips;
+    updateComparisonBaseVisibility();
+  }
+
+  function removeComparisonItem(key) {
+    const existing = comparisonState.items.get(key);
+    if (!existing) {
+      return;
+    }
+    chart.removeSeries(existing.series);
+    comparisonState.items.delete(key);
+    renderComparisonChips();
+    chart.timeScale().fitContent();
+  }
+
+  function addComparisonItem({ key, label, data }) {
+    if (comparisonState.items.has(key)) {
+      return;
+    }
+    const color = getComparisonColor(comparisonState.items.size);
+    const series = chart.addLineSeries({
+      color,
+      lineWidth: 2,
+      lineStyle: 2,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+    });
+    series.setData(data);
+    comparisonState.items.set(key, { key, label, color, series });
+    renderComparisonChips();
+    chart.timeScale().fitContent();
+  }
 
   function updateLegend(candle) {
     if (!candle) {
@@ -1185,6 +1342,53 @@ function mountPerformanceExplorer(performanceRoot, performance) {
         series.applyOptions(options);
       });
     });
+  }
+
+  function renderCompareIndexOptions() {
+    if (!compareIndexSelect) {
+      return;
+    }
+
+    const available = comparisonState.indexes.filter(
+      (indexObj) => indexObj.id !== currentIndexId && !comparisonState.items.has(`index:${indexObj.id}`)
+    );
+
+    if (!available.length) {
+      compareIndexSelect.innerHTML = `<option value="">No more indexes</option>`;
+      compareIndexSelect.disabled = true;
+      compareIndexAddButton.disabled = true;
+      return;
+    }
+
+    compareIndexSelect.disabled = false;
+    compareIndexAddButton.disabled = false;
+    compareIndexSelect.innerHTML = `
+      <option value="">Select index</option>
+      ${available
+        .map(
+          (indexObj) =>
+            `<option value="${escapeHtml(indexObj.id)}">${escapeHtml(indexObj.name)}</option>`
+        )
+        .join("")}
+    `;
+  }
+
+  async function loadComparisonIndexes() {
+    if (typeof loadIndexes !== "function") {
+      compareIndexSelect.innerHTML = `<option value="">Unavailable</option>`;
+      compareIndexSelect.disabled = true;
+      compareIndexAddButton.disabled = true;
+      return;
+    }
+
+    try {
+      comparisonState.indexes = await loadIndexes();
+      renderCompareIndexOptions();
+    } catch {
+      compareIndexSelect.innerHTML = `<option value="">Unavailable</option>`;
+      compareIndexSelect.disabled = true;
+      compareIndexAddButton.disabled = true;
+    }
   }
 
   function computeCurrentCandles() {
@@ -1386,8 +1590,123 @@ function mountPerformanceExplorer(performanceRoot, performance) {
     updateToolbarVisualState();
   };
 
+  const onCompareIndexAdd = async () => {
+    clearCompareError();
+    if (typeof loadPerformance !== "function") {
+      setCompareError("Index comparison is unavailable.");
+      return;
+    }
+
+    const indexId = String(compareIndexSelect.value || "").trim();
+    if (!indexId) {
+      setCompareError("Select an index first.");
+      return;
+    }
+
+    const selectedIndex = comparisonState.indexes.find((item) => item.id === indexId);
+    if (!selectedIndex) {
+      setCompareError("Selected index could not be found.");
+      return;
+    }
+
+    compareIndexAddButton.disabled = true;
+    try {
+      const comparisonPerformance = await loadPerformance(indexId);
+      const comparisonPoints = normalizeSeriesToBase(
+        normalizePoints(comparisonPerformance?.points || [])
+      );
+      if (comparisonPoints.length < 2) {
+        setCompareError(`Not enough history to compare with "${selectedIndex.name}".`);
+        return;
+      }
+
+      addComparisonItem({
+        key: `index:${indexId}`,
+        label: `Index: ${selectedIndex.name}`,
+        data: comparisonPoints,
+      });
+      renderCompareIndexOptions();
+    } catch (error) {
+      setCompareError(error instanceof Error ? error.message : "Failed to load index comparison.");
+    } finally {
+      compareIndexAddButton.disabled = false;
+    }
+  };
+
+  const onCompareCryptoAdd = async () => {
+    clearCompareError();
+    if (typeof loadMarketHistory !== "function") {
+      setCompareError("Crypto comparison is unavailable.");
+      return;
+    }
+
+    const symbol = String(compareCryptoInput.value || "").trim().toUpperCase();
+    if (!symbol) {
+      setCompareError("Enter a crypto symbol (example: BTC).");
+      return;
+    }
+
+    const key = `crypto:${symbol}`;
+    if (comparisonState.items.has(key)) {
+      setCompareError(`${symbol} is already in the comparison list.`);
+      return;
+    }
+
+    compareCryptoAddButton.disabled = true;
+    try {
+      const history = await loadMarketHistory(symbol);
+      const cryptoPoints = normalizeSeriesToBase(normalizeMarketPoints(history?.points || []));
+      if (cryptoPoints.length < 2) {
+        setCompareError(`Not enough history to compare with "${symbol}".`);
+        return;
+      }
+
+      addComparisonItem({
+        key,
+        label: `Crypto: ${symbol}`,
+        data: cryptoPoints,
+      });
+      compareCryptoInput.value = "";
+      renderCompareIndexOptions();
+    } catch (error) {
+      setCompareError(error instanceof Error ? error.message : "Failed to load crypto comparison.");
+    } finally {
+      compareCryptoAddButton.disabled = false;
+    }
+  };
+
+  const onCompareChipClick = (event) => {
+    const removeButton = event.target.closest("[data-compare-remove]");
+    if (!removeButton) {
+      return;
+    }
+    clearCompareError();
+    const key = removeButton.getAttribute("data-compare-remove");
+    if (!key) {
+      return;
+    }
+    removeComparisonItem(key);
+    renderCompareIndexOptions();
+  };
+
   candleSizeRow.addEventListener("click", onCandleSizeClick);
   modeRow.addEventListener("click", onModeClick);
+  compareIndexAddButton.addEventListener("click", () => {
+    void onCompareIndexAdd();
+  });
+  compareCryptoAddButton.addEventListener("click", () => {
+    void onCompareCryptoAdd();
+  });
+  compareCryptoInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    void onCompareCryptoAdd();
+  });
+  compareChipList.addEventListener("click", onCompareChipClick);
+  void loadComparisonIndexes();
+  renderComparisonChips();
 
   const closeIndicatorPanel = () => {
     indicatorPanel.hidden = true;
@@ -1664,6 +1983,10 @@ function mountPerformanceExplorer(performanceRoot, performance) {
     resizeObserver.disconnect();
     candleSizeRow.removeEventListener("click", onCandleSizeClick);
     modeRow.removeEventListener("click", onModeClick);
+    compareIndexAddButton.removeEventListener("click", onCompareIndexAdd);
+    compareCryptoAddButton.removeEventListener("click", onCompareCryptoAdd);
+    compareCryptoInput.removeEventListener("keydown", onCompareCryptoAdd);
+    compareChipList.removeEventListener("click", onCompareChipClick);
     indicatorOpenButton.removeEventListener("click", onIndicatorOpen);
     indicatorCloseButton.removeEventListener("click", onIndicatorClose);
     indicatorListNode.removeEventListener("click", onIndicatorListClick);

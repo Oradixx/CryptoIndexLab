@@ -17,7 +17,7 @@ services:
       api2:
         condition: service_healthy
     networks:
-      - cryptoindexlab-net
+      - frontend-net
 
   api1:
     build:
@@ -38,7 +38,8 @@ services:
       db1:
         condition: service_healthy
     networks:
-      - cryptoindexlab-net
+      - frontend-net
+      - api1-db-net
 
   api2:
     build:
@@ -67,7 +68,8 @@ services:
       api1:
         condition: service_healthy
     networks:
-      - cryptoindexlab-net
+      - frontend-net
+      - api2-db-net
 
   db1:
     image: postgres:16-alpine
@@ -86,7 +88,7 @@ services:
     volumes:
       - db1-data:/var/lib/postgresql/data
     networks:
-      - cryptoindexlab-net
+      - api1-db-net
 
   db2:
     image: postgres:16-alpine
@@ -105,12 +107,16 @@ services:
     volumes:
       - db2-data:/var/lib/postgresql/data
     networks:
-      - cryptoindexlab-net
+      - api2-db-net
 
 volumes:
   db1-data:
   db2-data:
 
 networks:
-  cryptoindexlab-net:
+  frontend-net:
+    driver: bridge
+  api1-db-net:
+    driver: bridge
+  api2-db-net:
     driver: bridge

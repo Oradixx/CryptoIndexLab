@@ -33,6 +33,9 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
 
 COPY --from=builder /opt/venv /opt/venv
 
+RUN find /opt/venv -type d \( -name 'pip-*.dist-info' -o -name 'setuptools-*.dist-info' -o -name 'wheel-*.dist-info' \) -exec rm -rf {} + \
+    && rm -f /opt/venv/bin/pip /opt/venv/bin/pip3 /opt/venv/bin/pip3.*
+
 COPY --chown=appuser:appgroup src ./src
 
 USER appuser

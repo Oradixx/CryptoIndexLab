@@ -824,7 +824,7 @@ function renderCandleDetails(candle) {
   `;
 }
 
-function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig = {}) {
+function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig = {}, indexDetail = null) {
   const LightweightCharts = window.LightweightCharts;
   if (!LightweightCharts || typeof LightweightCharts.createChart !== "function") {
     performanceRoot.innerHTML = `
@@ -934,9 +934,30 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     indexes: [],
   };
 
+  const indexHeaderHtml = indexDetail ? `
+    <div class="chart-index-header">
+      <h2 class="chart-index-title">${escapeHtml(indexDetail.name)}</h2>
+      <span class="chart-index-meta muted">${escapeHtml(buildDescription(indexDetail.description))} · Created: ${formatDate(indexDetail.created_at)}</span>
+      <div class="chart-index-allocation">
+        ${(indexDetail.assets || []).map((a) => {
+          const w = Math.max(0, Math.min(100, Number(a.weight)));
+          return `
+            <div class="chart-index-allocation-line">
+              <span class="chart-index-allocation-label">${escapeHtml(a.symbol)}</span>
+              <div class="chart-index-allocation-track">
+                <span class="chart-index-allocation-fill" style="width:${w}%"></span>
+              </div>
+              <span class="chart-index-allocation-pct">${w.toFixed(0)}%</span>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>
+  ` : "";
+
   performanceRoot.innerHTML = `
     <section class="performance-explorer stack">
       <div class="chart-panel">
+        ${indexHeaderHtml}
         <div class="chart-controls">
           <div class="control-cluster">
             <p class="control-label">Candle Size</p>
@@ -967,7 +988,6 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
           <div class="indicator-detail-container" data-indicator-detail></div>
         </div>
         <div class="chart-head">
-          <h4 class="chart-title">Market Context</h4>
           <p class="chart-legend" data-chart-legend></p>
         </div>
         <div class="tv-chart-host" data-chart-host></div>
@@ -975,17 +995,12 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
       <section class="comparison-panel stack" data-comparison-panel>
         <div class="chart-controls comparison-controls">
           <div class="control-cluster control-cluster-grow">
-            <p class="control-label">Compare With Other Indexes</p>
+            <p class="control-label">Compare</p>
             <div class="control-buttons comparison-row">
-              <select class="compare-select" data-compare-index-select></select>
-              <button class="button button-secondary" type="button" data-compare-index-add>Add index</button>
-            </div>
-          </div>
-          <div class="control-cluster control-cluster-grow">
-            <p class="control-label">Compare With Crypto</p>
-            <div class="control-buttons comparison-row">
-              <input class="compare-input" type="text" maxlength="10" placeholder="BTC, ETH..." data-compare-crypto-input>
-              <button class="button button-secondary" type="button" data-compare-crypto-add>Add crypto</button>
+              <select class="compare-select" data-compare-select>
+                <option value="">Add to comparison...</option>
+              </select>
+              <button class="button button-secondary" type="button" data-compare-add>Add</button>
             </div>
           </div>
         </div>
@@ -1013,10 +1028,8 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
   const indicatorModal = performanceRoot.querySelector("[data-indicator-modal]");
   const indicatorDetailNode = performanceRoot.querySelector("[data-indicator-detail]");
   const comparisonPanel = performanceRoot.querySelector("[data-comparison-panel]");
-  const compareIndexSelect = performanceRoot.querySelector("[data-compare-index-select]");
-  const compareIndexAddButton = performanceRoot.querySelector("[data-compare-index-add]");
-  const compareCryptoInput = performanceRoot.querySelector("[data-compare-crypto-input]");
-  const compareCryptoAddButton = performanceRoot.querySelector("[data-compare-crypto-add]");
+  const compareSelect = performanceRoot.querySelector("[data-compare-select]");
+  const compareAddButton = performanceRoot.querySelector("[data-compare-add]");
   const compareChipList = performanceRoot.querySelector("[data-compare-chip-list]");
   const compareErrorNode = performanceRoot.querySelector("[data-compare-error]");
 
@@ -1280,11 +1293,11 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     const color = getComparisonColor(comparisonState.items.size);
     const series = chart.addLineSeries({
       color,
-      lineWidth: 2,
-      lineStyle: 2,
+      lineWidth: 3,
+      lineStyle: 0,
       priceLineVisible: false,
       lastValueVisible: true,
-      crosshairMarkerVisible: false,
+      crosshairMarkerVisible: true,
     });
     series.setData(data);
     comparisonState.items.set(key, { key, label, color, series });
@@ -1344,51 +1357,51 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     });
   }
 
-  function renderCompareIndexOptions() {
-    if (!compareIndexSelect) {
+  const SUPPORTED_CRYPTOS = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "BNB"];
+
+  function renderCompareOptions() {
+    if (!compareSelect) {
       return;
     }
 
-    const available = comparisonState.indexes.filter(
+    const cryptoOptions = SUPPORTED_CRYPTOS
+      .filter((symbol) => !comparisonState.items.has(`crypto:${symbol}`))
+      .map((symbol) => `<option value="crypto:${symbol}">${symbol}</option>`)
+      .join("");
+
+    const availableIndexes = comparisonState.indexes.filter(
       (indexObj) => indexObj.id !== currentIndexId && !comparisonState.items.has(`index:${indexObj.id}`)
     );
+    const indexOptions = availableIndexes
+      .map(
+        (indexObj) =>
+          `<option value="index:${escapeHtml(indexObj.id)}">${escapeHtml(indexObj.name)}</option>`
+      )
+      .join("");
 
-    if (!available.length) {
-      compareIndexSelect.innerHTML = `<option value="">No more indexes</option>`;
-      compareIndexSelect.disabled = true;
-      compareIndexAddButton.disabled = true;
-      return;
-    }
+    const hasOptions = cryptoOptions || indexOptions;
+    compareSelect.disabled = !hasOptions;
+    compareAddButton.disabled = !hasOptions;
 
-    compareIndexSelect.disabled = false;
-    compareIndexAddButton.disabled = false;
-    compareIndexSelect.innerHTML = `
-      <option value="">Select index</option>
-      ${available
-        .map(
-          (indexObj) =>
-            `<option value="${escapeHtml(indexObj.id)}">${escapeHtml(indexObj.name)}</option>`
-        )
-        .join("")}
+    compareSelect.innerHTML = `
+      <option value="">Add to comparison...</option>
+      ${cryptoOptions ? `<optgroup label="Cryptos">${cryptoOptions}</optgroup>` : ""}
+      ${indexOptions ? `<optgroup label="My Indexes">${indexOptions}</optgroup>` : ""}
     `;
   }
 
   async function loadComparisonIndexes() {
     if (typeof loadIndexes !== "function") {
-      compareIndexSelect.innerHTML = `<option value="">Unavailable</option>`;
-      compareIndexSelect.disabled = true;
-      compareIndexAddButton.disabled = true;
+      renderCompareOptions();
       return;
     }
 
     try {
       comparisonState.indexes = await loadIndexes();
-      renderCompareIndexOptions();
     } catch {
-      compareIndexSelect.innerHTML = `<option value="">Unavailable</option>`;
-      compareIndexSelect.disabled = true;
-      compareIndexAddButton.disabled = true;
+      // indexes stay empty, cryptos still available
     }
+    renderCompareOptions();
   }
 
   function computeCurrentCandles() {
@@ -1590,88 +1603,63 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     updateToolbarVisualState();
   };
 
-  const onCompareIndexAdd = async () => {
+  const onCompareAdd = async () => {
     clearCompareError();
-    if (typeof loadPerformance !== "function") {
-      setCompareError("Index comparison is unavailable.");
+    const selected = String(compareSelect.value || "").trim();
+    if (!selected) {
+      setCompareError("Select an item to compare.");
       return;
     }
 
-    const indexId = String(compareIndexSelect.value || "").trim();
-    if (!indexId) {
-      setCompareError("Select an index first.");
-      return;
-    }
-
-    const selectedIndex = comparisonState.indexes.find((item) => item.id === indexId);
-    if (!selectedIndex) {
-      setCompareError("Selected index could not be found.");
-      return;
-    }
-
-    compareIndexAddButton.disabled = true;
+    compareAddButton.disabled = true;
     try {
-      const comparisonPerformance = await loadPerformance(indexId);
-      const comparisonPoints = normalizeSeriesToBase(
-        normalizePoints(comparisonPerformance?.points || [])
-      );
-      if (comparisonPoints.length < 2) {
-        setCompareError(`Not enough history to compare with "${selectedIndex.name}".`);
-        return;
+      if (selected.startsWith("crypto:")) {
+        const symbol = selected.slice("crypto:".length);
+        if (typeof loadMarketHistory !== "function") {
+          setCompareError("Crypto comparison is unavailable.");
+          return;
+        }
+        const history = await loadMarketHistory(symbol);
+        const cryptoPoints = normalizeSeriesToBase(normalizeMarketPoints(history?.points || []));
+        if (cryptoPoints.length < 2) {
+          setCompareError(`Not enough history to compare with "${symbol}".`);
+          return;
+        }
+        addComparisonItem({
+          key: selected,
+          label: `Crypto: ${symbol}`,
+          data: cryptoPoints,
+        });
+      } else if (selected.startsWith("index:")) {
+        const indexId = selected.slice("index:".length);
+        if (typeof loadPerformance !== "function") {
+          setCompareError("Index comparison is unavailable.");
+          return;
+        }
+        const selectedIndex = comparisonState.indexes.find((item) => item.id === indexId);
+        if (!selectedIndex) {
+          setCompareError("Selected index could not be found.");
+          return;
+        }
+        const comparisonPerformance = await loadPerformance(indexId);
+        const comparisonPoints = normalizeSeriesToBase(
+          normalizePoints(comparisonPerformance?.points || [])
+        );
+        if (comparisonPoints.length < 2) {
+          setCompareError(`Not enough history to compare with "${selectedIndex.name}".`);
+          return;
+        }
+        addComparisonItem({
+          key: selected,
+          label: `Index: ${selectedIndex.name}`,
+          data: comparisonPoints,
+        });
       }
-
-      addComparisonItem({
-        key: `index:${indexId}`,
-        label: `Index: ${selectedIndex.name}`,
-        data: comparisonPoints,
-      });
-      renderCompareIndexOptions();
+      renderCompareOptions();
     } catch (error) {
-      setCompareError(error instanceof Error ? error.message : "Failed to load index comparison.");
+      setCompareError(error instanceof Error ? error.message : "Failed to load comparison.");
     } finally {
-      compareIndexAddButton.disabled = false;
-    }
-  };
-
-  const onCompareCryptoAdd = async () => {
-    clearCompareError();
-    if (typeof loadMarketHistory !== "function") {
-      setCompareError("Crypto comparison is unavailable.");
-      return;
-    }
-
-    const symbol = String(compareCryptoInput.value || "").trim().toUpperCase();
-    if (!symbol) {
-      setCompareError("Enter a crypto symbol (example: BTC).");
-      return;
-    }
-
-    const key = `crypto:${symbol}`;
-    if (comparisonState.items.has(key)) {
-      setCompareError(`${symbol} is already in the comparison list.`);
-      return;
-    }
-
-    compareCryptoAddButton.disabled = true;
-    try {
-      const history = await loadMarketHistory(symbol);
-      const cryptoPoints = normalizeSeriesToBase(normalizeMarketPoints(history?.points || []));
-      if (cryptoPoints.length < 2) {
-        setCompareError(`Not enough history to compare with "${symbol}".`);
-        return;
-      }
-
-      addComparisonItem({
-        key,
-        label: `Crypto: ${symbol}`,
-        data: cryptoPoints,
-      });
-      compareCryptoInput.value = "";
-      renderCompareIndexOptions();
-    } catch (error) {
-      setCompareError(error instanceof Error ? error.message : "Failed to load crypto comparison.");
-    } finally {
-      compareCryptoAddButton.disabled = false;
+      compareAddButton.disabled = false;
     }
   };
 
@@ -1686,23 +1674,13 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
       return;
     }
     removeComparisonItem(key);
-    renderCompareIndexOptions();
+    renderCompareOptions();
   };
 
   candleSizeRow.addEventListener("click", onCandleSizeClick);
   modeRow.addEventListener("click", onModeClick);
-  compareIndexAddButton.addEventListener("click", () => {
-    void onCompareIndexAdd();
-  });
-  compareCryptoAddButton.addEventListener("click", () => {
-    void onCompareCryptoAdd();
-  });
-  compareCryptoInput.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") {
-      return;
-    }
-    event.preventDefault();
-    void onCompareCryptoAdd();
+  compareAddButton.addEventListener("click", () => {
+    void onCompareAdd();
   });
   compareChipList.addEventListener("click", onCompareChipClick);
   void loadComparisonIndexes();
@@ -1983,9 +1961,7 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     resizeObserver.disconnect();
     candleSizeRow.removeEventListener("click", onCandleSizeClick);
     modeRow.removeEventListener("click", onModeClick);
-    compareIndexAddButton.removeEventListener("click", onCompareIndexAdd);
-    compareCryptoAddButton.removeEventListener("click", onCompareCryptoAdd);
-    compareCryptoInput.removeEventListener("keydown", onCompareCryptoAdd);
+    compareAddButton.removeEventListener("click", onCompareAdd);
     compareChipList.removeEventListener("click", onCompareChipClick);
     indicatorOpenButton.removeEventListener("click", onIndicatorOpen);
     indicatorCloseButton.removeEventListener("click", onIndicatorClose);
@@ -2011,6 +1987,8 @@ export async function mountIndexDetailView(
     indexId,
     loadIndexDetail,
     loadPerformance,
+    loadIndexes,
+    loadMarketHistory,
     onNavigate,
   }
 ) {
@@ -2042,12 +2020,12 @@ export async function mountIndexDetailView(
       <section class="panel panel-flat stack">
         <div class="alert alert-error">${escapeHtml(message)}</div>
         <div class="button-row">
-          <button class="button button-secondary" type="button" data-back-list>Back to list</button>
+          <button class="button button-secondary" type="button" data-back-list>Back</button>
         </div>
       </section>
     `;
     root.querySelector("[data-back-list]").addEventListener("click", () => {
-      onNavigate(ROUTE_PATHS.indexList);
+      onNavigate(ROUTE_PATHS.dashboard);
     });
     return;
   }
@@ -2055,22 +2033,7 @@ export async function mountIndexDetailView(
   content.hidden = false;
   content.innerHTML = `
     <div class="stack">
-      <div>
-        <h2 class="page-title">${escapeHtml(indexDetail.name)}</h2>
-        <p class="page-subtitle">${escapeHtml(buildDescription(indexDetail.description))}</p>
-        <p class="page-subtitle">
-          Created: ${formatDate(indexDetail.created_at)}
-        </p>
-      </div>
-      <section class="stack">
-        <h3 class="section-title">Allocation</h3>
-        ${renderAssetComposition(indexDetail.assets)}
-      </section>
       <section class="stack" data-performance-section>
-        <h3 class="section-title">Market Context</h3>
-        <p class="section-description">
-          Use this chart to validate behavior after adjusting the index composition.
-        </p>
         <p class="loading" data-loading-performance>Loading performance...</p>
       </section>
     </div>
@@ -2084,11 +2047,16 @@ export async function mountIndexDetailView(
   try {
     const performance = await loadPerformance(indexId);
     performanceSection.innerHTML = `
-      <h3 class="section-title">Market Context</h3>
       <div data-performance-root></div>
     `;
     const performanceRoot = performanceSection.querySelector("[data-performance-root]");
-    mountPerformanceExplorer(performanceRoot, performance);
+    mountPerformanceExplorer(performanceRoot, performance, {
+      currentIndexId: indexId,
+      currentIndexName: indexDetail.name,
+      loadIndexes,
+      loadPerformance,
+      loadMarketHistory,
+    }, indexDetail);
   } catch (error) {
     const statusCode = error && typeof error === "object" ? error.statusCode : null;
     const message =
@@ -2098,7 +2066,6 @@ export async function mountIndexDetailView(
           ? error.message
           : "Failed to load performance data.";
     performanceSection.innerHTML = `
-      <h3 class="section-title">Market Context</h3>
       <div class="alert alert-error">Performance fetch failed: ${escapeHtml(message)}</div>
     `;
   } finally {

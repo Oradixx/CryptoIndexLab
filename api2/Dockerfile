@@ -27,6 +27,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip>=25.3" \
+    && pip uninstall -y pip setuptools \
     && groupadd --gid 10001 appgroup \
     && useradd --uid 10001 --gid appgroup --home-dir /app --shell /usr/sbin/nologin appuser \
     && chown appuser:appgroup /app

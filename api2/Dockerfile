@@ -13,7 +13,7 @@ RUN python -m venv "${VENV_PATH}"
 ENV PATH="${VENV_PATH}/bin:${PATH}"
 
 COPY requirements.txt .
-RUN pip install --upgrade pip \
+RUN pip install --upgrade "pip>=25.3" \
     && pip install --requirement requirements.txt \
     && pip check
 

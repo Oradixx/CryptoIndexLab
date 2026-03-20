@@ -14,26 +14,8 @@ services:
         condition: service_healthy
       api2:
         condition: service_healthy
-    networks:
-      - frontend-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
-      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
-
-  traefik:
-    image: traefik:v3.0
-    container_name: cryptoindexlab-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
     ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "${FRONTEND_PORT:-3000}:8080"
     networks:
       - frontend-net
 

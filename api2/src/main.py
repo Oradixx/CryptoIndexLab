@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description="Business service for custom crypto index management in CryptoIndexLab.",
         lifespan=lifespan,
+        root_path="/api2",
     )
 
     app.state.market_data_service = MarketDataService()

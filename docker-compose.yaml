@@ -6,8 +6,6 @@ services:
       context: ./frontend
     container_name: cryptoindexlab-frontend
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:8080"
     environment:
       FRONTEND_PUBLIC_API1_URL: "${FRONTEND_PUBLIC_API1_URL:-/api1}"
       FRONTEND_PUBLIC_API2_URL: "${FRONTEND_PUBLIC_API2_URL:-/api2}"
@@ -16,6 +14,26 @@ services:
         condition: service_healthy
       api2:
         condition: service_healthy
+    networks:
+      - frontend-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
+
+  traefik:
+    image: traefik:v3.0
+    container_name: cryptoindexlab-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - frontend-net
 
@@ -80,7 +98,7 @@ services:
       POSTGRES_USER: "${DB1_USER:-crypto_user}"
       POSTGRES_PASSWORD: "${DB1_PASSWORD:-crypto_pass}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB1_USER:-crypto_user} -d ${DB1_NAME:-crypto_auth}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB1_USER:-crypto_user} -d ${DB1_NAME:-crypto_auth}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -99,7 +117,7 @@ services:
       POSTGRES_USER: "${DB2_USER:-crypto_user}"
       POSTGRES_PASSWORD: "${DB2_PASSWORD:-crypto_pass}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB2_USER:-crypto_user} -d ${DB2_NAME:-crypto_index}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB2_USER:-crypto_user} -d ${DB2_NAME:-crypto_index}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -112,6 +130,7 @@ services:
 volumes:
   db1-data:
   db2-data:
+
 
 networks:
   frontend-net:

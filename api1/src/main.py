@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description="User management and authentication service for CryptoIndexLab.",
         lifespan=lifespan,
+        root_path="/api1",
     )
 
     app.state.token_manager = SimpleTokenManager(

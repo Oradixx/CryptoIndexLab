@@ -1,0 +1,10 @@
+{
+  "executionEnvironments": [
+    {
+      "root": "api1"
+    },
+    {
+      "root": "api2"
+    }
+  ]
+}

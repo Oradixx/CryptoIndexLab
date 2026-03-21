@@ -1225,7 +1225,7 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     lineWidth: 2,
     lineStyle: 0,
     priceLineVisible: false,
-    lastValueVisible: true,
+    lastValueVisible: false,
     crosshairMarkerVisible: false,
     visible: false,
   });
@@ -1250,7 +1250,8 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
   }
 
   function updateComparisonBaseVisibility() {
-    comparisonBaseSeries.applyOptions({ visible: comparisonState.items.size > 0 });
+    const show = comparisonState.items.size > 0 && state.chartMode === "line";
+    comparisonBaseSeries.applyOptions({ visible: show });
   }
 
   function renderComparisonChips() {
@@ -1338,6 +1339,7 @@ function mountPerformanceExplorer(performanceRoot, performance, comparisonConfig
     ema50Series.applyOptions({ visible: state.indicators.ema50.enabled });
     bbUpperSeries.applyOptions({ visible: state.indicators.bb20.enabled });
     bbLowerSeries.applyOptions({ visible: state.indicators.bb20.enabled });
+    updateComparisonBaseVisibility();
   }
 
   function applyIndicatorStyles() {

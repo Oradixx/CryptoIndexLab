@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(ssh CryptoIndexLab \"cd ~/CryptoIndexLab && sed -i ''s/FRONTEND_PORT=3000/FRONTEND_PORT=80/'' .env && docker compose up -d --build\")",
-      "Bash(ssh CryptoIndexLab \"docker compose -f ~/CryptoIndexLab/docker-compose.yaml ps\")"
+      "Bash(ssh CryptoIndexLab \"docker compose -f ~/CryptoIndexLab/docker-compose.yaml ps\")",
+      "Bash(tar --exclude='.git' --exclude='__pycache__' -czf /tmp/cryptoindexlab.tar.gz .)",
+      "Bash(ssh CryptoIndexLab \"cd ~/CryptoIndexLab && tar -xzf ~/cryptoindexlab.tar.gz && rm ~/cryptoindexlab.tar.gz && docker compose up -d --build\")",
+      "Bash(pip3 install:*)"
     ]
   }
 }

@@ -71,7 +71,7 @@ function renderTopbar(route) {
   return `
     <header class="topbar">
       <div class="brand">
-        <h1 class="brand-title">CryptoIndexLab</h1>
+        <img src="/logo.png" alt="CryptoIndexLab" class="brand-logo">
       </div>
       <nav class="nav-links">
         ${loggedIn ? appLinks : authLinks}

@@ -80,10 +80,7 @@ export async function mountDashboardView(root, { currentUser, onNavigate, onOpen
 
   root.innerHTML = `
     <section class="stack">
-      <div>
-        <h2 class="page-title">Dashboard</h2>
-        <p class="page-subtitle">Welcome ${displayName}.</p>
-      </div>
+      <h2 class="welcome-title">Welcome ${displayName} !</h2>
       <div class="button-row">
         <button class="button button-primary" type="button" data-create-index>Create new index</button>
       </div>

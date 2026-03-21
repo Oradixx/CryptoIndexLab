@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:\\Users\\kelli\\Bureau"
+    ],
+    "allow": [
+      "Read(//c/Users/kelli/.ssh/**)"
+    ]
+  }
+}

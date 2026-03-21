@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh CryptoIndexLab \"cd ~/CryptoIndexLab && sed -i ''s/FRONTEND_PORT=3000/FRONTEND_PORT=80/'' .env && docker compose up -d --build\")",
+      "Bash(ssh CryptoIndexLab \"docker compose -f ~/CryptoIndexLab/docker-compose.yaml ps\")"
+    ]
+  }
+}

@@ -1,19 +1,19 @@
 # CryptoIndexLab
 
-A microservices web application where users create and monitor custom cryptocurrency indexes — weighted baskets of coins tracked over time with historical performance charts.
+A microservices web application where users create and monitor custom cryptocurrency indexes   weighted baskets of coins tracked over time with historical performance charts.
 
 Built as a school project to learn containerization, service isolation, and Docker Compose orchestration.
 
 ## Features
 
-- **User accounts** — register, log in, and manage a personal session with JWT-based authentication.
-- **Custom indexes** — create named indexes composed of multiple crypto assets with custom weights (e.g. 50% BTC, 30% ETH, 20% SOL).
-- **Full CRUD** — edit index name, description, and composition; delete indexes you no longer need.
-- **Historical performance** — each index gets a daily performance series computed from real market data (CoinGecko API), displayed as an interactive chart.
-- **Technical indicators** — overlay SMA, EMA, RSI, MACD, and Bollinger Bands on the performance chart.
-- **Index comparison** — compare your indexes against each other or against individual cryptos (BTC, ETH, etc.) on a normalized base-100 chart.
-- **User isolation** — each user only sees and manages their own indexes.
-- **Dockerized stack** — the entire app runs with a single `docker compose up` command.
+- **User accounts**   register, log in, and manage a personal session with JWT-based authentication.
+- **Custom indexes**   create named indexes composed of multiple crypto assets with custom weights (e.g. 50% BTC, 30% ETH, 20% SOL).
+- **Full CRUD**   edit index name, description, and composition; delete indexes you no longer need.
+- **Historical performance**   each index gets a daily performance series computed from real market data (CoinGecko API), displayed as an interactive chart.
+- **Technical indicators**   overlay SMA, EMA, RSI, MACD, and Bollinger Bands on the performance chart.
+- **Index comparison**   compare your indexes against each other or against individual cryptos (BTC, ETH, etc.) on a normalized base-100 chart.
+- **User isolation**   each user only sees and manages their own indexes.
+- **Dockerized stack**   the entire app runs with a single `docker compose up` command.
 
 ## Technology Stack
 
@@ -61,7 +61,7 @@ graph TB
 
 ### Communication Rules
 
-The services follow strict separation — this is a key part of the project:
+The services follow strict separation   this is a key part of the project:
 
 | Path | Allowed | How |
 |------|---------|-----|
@@ -162,7 +162,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 | `FRONTEND_PUBLIC_API1_URL` | frontend | Browser-facing URL for api1 (proxied by Nginx) | `/api1` |
 | `FRONTEND_PUBLIC_API2_URL` | frontend | Browser-facing URL for api2 (proxied by Nginx) | `/api2` |
 
-### API1 — Authentication Service
+### API1   Authentication Service
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
@@ -174,7 +174,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 | `API1_DB_INIT_MAX_ATTEMPTS` | api1 | Max retries for DB connection at startup | `10` |
 | `API1_DB_INIT_RETRY_DELAY_SECONDS` | api1 | Delay between DB init retries | `2` |
 
-### API2 — Crypto Index Service
+### API2   Crypto Index Service
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
@@ -207,7 +207,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 ## API Endpoints
 
-### API1 — Authentication (`/api1`)
+### API1   Authentication (`/api1`)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -216,7 +216,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 | POST | `/login` | Log in and receive a bearer token | No |
 | GET | `/me` | Get current user info | Yes |
 
-### API2 — Crypto Indexes (`/api2`)
+### API2   Crypto Indexes (`/api2`)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -234,27 +234,27 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 Here is the typical user flow to demonstrate the application:
 
-1. **Register** — go to the register page, enter an email, name, and password. The account is created via api1.
+1. **Register**   go to the register page, enter an email, name, and password. The account is created via api1.
 
-2. **Log in** — use your credentials on the login page. A JWT token is stored in the browser for authenticated requests.
+2. **Log in**   use your credentials on the login page. A JWT token is stored in the browser for authenticated requests.
 
-3. **Create an index** — from the dashboard, open the create form. Pick a name (e.g. "My Top 3"), optionally add a description, then add assets with weights:
-   - BTC — 50%
-   - ETH — 30%
-   - SOL — 20%
+3. **Create an index**   from the dashboard, open the create form. Pick a name (e.g. "My Top 3"), optionally add a description, then add assets with weights:
+   - BTC   50%
+   - ETH   30%
+   - SOL   20%
    - Weights must add up to 100%.
 
-4. **View your indexes** — the dashboard lists all your saved indexes with a quick summary of their composition.
+4. **View your indexes**   the dashboard lists all your saved indexes with a quick summary of their composition.
 
-5. **Inspect performance** — click on an index to see its detail page:
+5. **Inspect performance**   click on an index to see its detail page:
    - Composition breakdown (assets and weights)
    - Historical performance chart computed from real CoinGecko data
    - Toggle technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
    - Compare with other indexes or individual cryptos on a normalized chart
 
-6. **Edit an index** — update the name, description, or change the asset allocation.
+6. **Edit an index**   update the name, description, or change the asset allocation.
 
-7. **Delete an index** — remove an index you no longer want (with confirmation).
+7. **Delete an index**   remove an index you no longer want (with confirmation).
 
 > **Screenshots**: demo screenshots will be added to `docs/screenshots/` before the final presentation.
 
@@ -264,7 +264,7 @@ The project uses Gitea Actions (`.gitea/workflows/ci.yaml`).
 
 **Pipeline steps**:
 1. Build Docker images for `frontend`, `api1`, and `api2`
-2. Scan each image with [Trivy](https://trivy.dev/) — fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
+2. Scan each image with [Trivy](https://trivy.dev/)   fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
 3. Push images to Docker Hub (only on `main` branch with credentials)
 
 **Image naming**: `docker.io/<namespace>/cryptoindexlab-<service>:<tag>`
@@ -280,7 +280,7 @@ Without credentials, the pipeline still builds and scans but skips the push step
 | Problem | Solution |
 |---------|----------|
 | Docker engine not running (Windows named pipe error) | Start Docker Desktop and wait until it's fully ready, then retry |
-| Services not healthy yet | Run `docker compose ps` and wait — healthchecks take a few seconds |
+| Services not healthy yet | Run `docker compose ps` and wait   healthchecks take a few seconds |
 | A backend fails to start | Check logs: `docker compose logs api1` or `docker compose logs api2` |
 | Database connection errors | Make sure `.env` exists and matches `.env.example` defaults |
 | CoinGecko rate limiting | Add a free API key in `API2_MARKET_DATA_API_KEY` or wait a few minutes |

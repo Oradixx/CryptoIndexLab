@@ -1,6 +1,24 @@
 name: cryptoindexlab
 
 services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cryptoindexlab-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      api1:
+        condition: service_healthy
+      api2:
+        condition: service_healthy
+    networks:
+      - frontend-net
+
   frontend:
     build:
       context: ./frontend
@@ -9,41 +27,13 @@ services:
     environment:
       FRONTEND_PUBLIC_API1_URL: "${FRONTEND_PUBLIC_API1_URL:-/api1}"
       FRONTEND_PUBLIC_API2_URL: "${FRONTEND_PUBLIC_API2_URL:-/api2}"
-    depends_on:
-      api1:
-        condition: service_healthy
-      api2:
-        condition: service_healthy
-    networks:
-      - frontend-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
-
-  traefik:
-    image: traefik:v3.6
-    container_name: cryptoindexlab-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - frontend-net
 
   api1:
     build:
       context: ./api1
-    container_name: cryptoindexlab-api1
     restart: unless-stopped
-    ports:
-      - "${API1_PORT:-8001}:8001"
     environment:
       PORT: 8001
       API1_LOG_LEVEL: "${API1_LOG_LEVEL:-info}"
@@ -55,6 +45,8 @@ services:
     depends_on:
       db1:
         condition: service_healthy
+    deploy:
+      replicas: 2
     networks:
       - frontend-net
       - api1-db-net
@@ -62,10 +54,7 @@ services:
   api2:
     build:
       context: ./api2
-    container_name: cryptoindexlab-api2
     restart: unless-stopped
-    ports:
-      - "${API2_PORT:-8002}:8002"
     environment:
       PORT: 8002
       API2_LOG_LEVEL: "${API2_LOG_LEVEL:-info}"
@@ -85,6 +74,8 @@ services:
         condition: service_healthy
       api1:
         condition: service_healthy
+    deploy:
+      replicas: 2
     networks:
       - frontend-net
       - api2-db-net
@@ -130,7 +121,6 @@ services:
 volumes:
   db1-data:
   db2-data:
-
 
 networks:
   frontend-net:

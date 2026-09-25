@@ -193,8 +193,8 @@ export async function mountEditIndexView(
       assets.push({ symbol, weight });
     }
 
-    if (totalWeight > 100) {
-      setError("Total asset weight must be less than or equal to 100.");
+    if (Math.round(totalWeight * 10000) !== 1000000) {
+      setError("Total asset weight must equal exactly 100%.");
       return;
     }
 

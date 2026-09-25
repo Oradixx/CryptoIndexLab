@@ -98,6 +98,7 @@ class IndexService:
         existing_index.name = normalized_name
         existing_index.description = normalized_description
         existing_index.assets.clear()
+        self._db_session.flush()
         existing_index.assets.extend(validated_assets)
 
         try:
@@ -173,9 +174,9 @@ class IndexService:
                 )
             )
 
-        if total_weight > 100:
+        if round(total_weight, 4) != 100:
             raise DomainValidationError(
-                "Total asset weight must be <= 100 for the current policy."
+                "Total asset weight must equal exactly 100."
             )
 
         return validated_assets

@@ -58,17 +58,12 @@ function consumeFlashMessage() {
 
 function renderTopbar(route) {
   const loggedIn = Boolean(state.currentUser);
-  const showBackToList = route.name === "indexDetail" || route.name === "indexEdit";
-
   const authLinks = `
     <a class="nav-link ${route.name === "login" ? "active" : ""}" href="#${ROUTE_PATHS.login}">Login</a>
     <a class="nav-link ${route.name === "register" ? "active" : ""}" href="#${ROUTE_PATHS.register}">Register</a>
   `;
 
   const appLinks = `
-    ${showBackToList
-      ? `<a class="nav-link" href="#${ROUTE_PATHS.indexList}">Back to list</a>`
-      : ""}
     <a class="nav-link ${route.name === "dashboard" ? "active" : ""}" href="#${ROUTE_PATHS.dashboard}">Dashboard</a>
     <button type="button" class="nav-button" data-logout>Logout</button>
   `;
@@ -76,7 +71,7 @@ function renderTopbar(route) {
   return `
     <header class="topbar">
       <div class="brand">
-        <h1 class="brand-title">CryptoIndexLab</h1>
+        <img src="/logo.png" alt="CryptoIndexLab" class="brand-logo">
       </div>
       <nav class="nav-links">
         ${loggedIn ? appLinks : authLinks}
@@ -221,6 +216,9 @@ async function renderCurrentRoute() {
       currentUser: state.currentUser,
       onNavigate: navigate,
       onOpenIndex: (indexId) => navigate(buildIndexDetailPath(indexId)),
+      onEditIndex: (indexId) => navigate(buildIndexEditPath(indexId)),
+      onDeleteIndex: (indexId) =>
+        runProtectedApiCall(() => indexService.deleteIndex(indexId)),
       loadIndexes: loadUserIndexes,
     });
     return;

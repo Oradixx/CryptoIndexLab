@@ -1,31 +1,31 @@
 # CryptoIndexLab
 
-A microservices web application where users create and monitor custom cryptocurrency indexes — weighted baskets of coins tracked over time with historical performance charts.
+A microservices web application where users create and monitor custom cryptocurrency indexes: weighted baskets of coins tracked over time with historical performance charts.
 
 ![Index detail page: allocation, candlestick chart with an indicator, and window statistics](docs/images/index-detail.png)
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Oradixx/CryptoIndexLab?quickstart=1)
 
-Built as a school project to learn containerization, service isolation, and Docker Compose orchestration (Containerization Technologies course, ESILV, March 2026). The project was first hosted on the school's Gitea; this repository is a mirror with the full commit history.
+Built as a school project to learn containerization, service isolation, and Docker Compose orchestration (Containerization Technologies course, ESILV, March 2026). The project was first hosted on the school's Gitea; this repository is a mirror with the full commit history. The final version was demoed on an AWS Lightsail server.
 
 ## Features
 
-- **User accounts** — register, log in, and manage a personal session with JWT-based authentication.
-- **Custom indexes** — create named indexes composed of multiple crypto assets with custom weights (e.g. 50% BTC, 30% ETH, 20% SOL).
-- **Full CRUD** — edit index name, description, and composition; delete indexes you no longer need.
-- **Historical performance** — each index gets a daily performance series computed from real market data (CoinGecko API), displayed as an interactive chart.
-- **Technical indicators** — overlay SMA, EMA, RSI, MACD, and Bollinger Bands on the performance chart.
-- **Index comparison** — compare your indexes against each other or against individual cryptos (BTC, ETH, etc.) on a normalized base-100 chart.
-- **User isolation** — each user only sees and manages their own indexes.
-- **Dockerized stack** — the entire app runs with a single `docker compose up` command.
+- **User accounts**: register, log in, and manage a personal session with JWT-based authentication.
+- **Custom indexes**: create named indexes composed of multiple crypto assets with custom weights (e.g. 50% BTC, 30% ETH, 20% SOL).
+- **Full CRUD**: edit index name, description, and composition; delete indexes you no longer need.
+- **Historical performance**: each index gets a daily performance series computed from real market data (CoinGecko API), displayed as an interactive chart.
+- **Technical indicators**: overlay SMA, EMA, RSI, MACD, and Bollinger Bands on the performance chart.
+- **Index comparison**: compare your indexes against each other or against individual cryptos (BTC, ETH, etc.) on a normalized base-100 chart.
+- **User isolation**: each user only sees and manages their own indexes.
+- **Dockerized stack**: the entire app runs with a single `docker compose up` command.
 
 ## Technology Stack
 
 | Layer | Technology | Details |
 |-------|-----------|---------|
 | Frontend | Vanilla JavaScript (ES6 modules) | Single-page app with client-side routing |
-| Reverse proxy | Traefik v3.6 | Single entry point on port 80, routes to the frontend via Docker labels |
-| Frontend server | Nginx 1.27.5 (unprivileged Alpine) | Serves static files and proxies API calls |
+| Gateway / load balancer | Nginx 1.27 (Alpine) | Single entry point on port 80: serves the frontend and load-balances `/api1` and `/api2` across 2 replicas each |
+| Frontend server | Nginx 1.27.5 (unprivileged Alpine) | Serves the static single-page app |
 | Charts | Lightweight Charts 4.2 | TradingView charting library |
 | Backend APIs | Python 3.12 + FastAPI | Two independent microservices |
 | Databases | PostgreSQL 16 (Alpine) | One dedicated instance per API |
@@ -40,26 +40,26 @@ graph TB
     Browser([Browser])
 
     subgraph Docker Compose
-        Traefik["traefik<br/><small>reverse proxy · port 80</small>"]
+        Gateway["nginx<br/><small>gateway + load balancer · port 80</small>"]
         Frontend["frontend<br/><small>Nginx · port 8080</small>"]
 
         subgraph Authentication
-            API1["api1<br/><small>FastAPI · port 8001</small>"]
+            API1["api1 × 2<br/><small>FastAPI · port 8001</small>"]
             DB1[("db1<br/><small>PostgreSQL<br/>crypto_auth</small>")]
         end
 
         subgraph Business Logic
-            API2["api2<br/><small>FastAPI · port 8002</small>"]
+            API2["api2 × 2<br/><small>FastAPI · port 8002</small>"]
             DB2[("db2<br/><small>PostgreSQL<br/>crypto_index</small>")]
         end
     end
 
     CoinGecko([CoinGecko API])
 
-    Browser -->|HTTP| Traefik
-    Traefik -->|all requests| Frontend
-    Frontend -->|/api1/*| API1
-    Frontend -->|/api2/*| API2
+    Browser -->|HTTP| Gateway
+    Gateway -->|/| Frontend
+    Gateway -->|/api1/*| API1
+    Gateway -->|/api2/*| API2
     API1 -->|SQL| DB1
     API2 -->|SQL| DB2
     API2 -->|token validation| API1
@@ -68,12 +68,12 @@ graph TB
 
 ### Communication Rules
 
-The services follow strict separation — this is a key part of the project:
+The services follow strict separation, this is a key part of the project:
 
 | Path | Allowed | How |
 |------|---------|-----|
-| frontend → api1 | Yes | Nginx reverse proxy (`/api1/*`) |
-| frontend → api2 | Yes | Nginx reverse proxy (`/api2/*`) |
+| browser → api1 | Yes | Nginx gateway (`/api1/*`), load-balanced across the replicas |
+| browser → api2 | Yes | Nginx gateway (`/api2/*`), load-balanced across the replicas |
 | api1 → db1 | Yes | Direct SQL connection (SQLAlchemy) |
 | api2 → db2 | Yes | Direct SQL connection (SQLAlchemy) |
 | api2 → api1 | Yes | HTTP call to `/me` for token validation |
@@ -87,7 +87,7 @@ The isolation is also enforced at the **network level**: each database sits on i
 
 | Network | Services |
 |---------|----------|
-| `frontend-net` | traefik, frontend, api1, api2 |
+| `frontend-net` | nginx, frontend, api1, api2 |
 | `api1-db-net` | api1, db1 |
 | `api2-db-net` | api2, db2 |
 
@@ -97,10 +97,10 @@ So api1 cannot even resolve `db2`, and the frontend cannot reach either database
 
 | Service | Role | Port |
 |---------|------|------|
-| `traefik` | Reverse proxy, routes every request to the frontend | 80 (dashboard on 8080) |
-| `frontend` | SPA served by Nginx, proxies API calls to backends | 8080 (internal, behind Traefik) |
-| `api1` | User registration, login, JWT token management | 8001 |
-| `api2` | Index CRUD, market data retrieval, performance calculation | 8002 |
+| `nginx` | Gateway: serves the frontend, load-balances the APIs | 80 |
+| `frontend` | SPA served by Nginx | 8080 (internal) |
+| `api1` (2 replicas) | User registration, login, JWT token management | 8001 (internal) |
+| `api2` (2 replicas) | Index CRUD, market data retrieval, performance calculation | 8002 (internal) |
 | `db1` | PostgreSQL database dedicated to api1 (users table) | internal |
 | `db2` | PostgreSQL database dedicated to api2 (indexes + assets tables) | internal |
 
@@ -135,7 +135,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Once all services show `healthy`, open **http://localhost** in your browser (Traefik listens on port 80; its dashboard is on http://localhost:8080 — insecure mode, for local development only).
+Once all services show `healthy`, open **http://localhost** in your browser (the Nginx gateway listens on port 80; set `APP_PORT` in `.env` to use another port).
 
 ### Frontend Hot Reload (Development)
 
@@ -156,13 +156,15 @@ docker compose down -v         # stops containers AND deletes database volumes
 
 ## Docker Orchestration
 
-The stack is defined in `docker-compose.yaml` and includes 6 services (traefik, frontend, api1, api2, db1, db2) on three bridge networks (see [Communication Rules](#communication-rules)).
+The stack is defined in `docker-compose.yaml`: 6 services (nginx, frontend, api1, api2, db1, db2) and 8 containers, since each API runs 2 replicas, on three bridge networks (see [Communication Rules](#communication-rules)).
 
 **Startup order** is managed with healthchecks:
 1. `db1` and `db2` start first (PostgreSQL readiness check via `pg_isready`)
 2. `api1` starts after `db1` is healthy
 3. `api2` starts after both `db2` and `api1` are healthy
-4. `frontend` starts after both `api1` and `api2` are healthy
+4. `nginx` starts once `frontend`, `api1` and `api2` are healthy
+
+**Load balancing**: `api1` and `api2` run with `deploy.replicas: 2`. The gateway resolves the service names through Docker's internal DNS (`resolver 127.0.0.11`), which returns one address per replica, and Nginx spreads the requests across them. `docker-compose.dev.yaml` goes back to one replica for development.
 
 **Persistence**: database data is stored in named Docker volumes (`db1-data`, `db2-data`) so data survives container restarts.
 
@@ -183,15 +185,16 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
-| `FRONTEND_PORT` | frontend | Not used anymore: the UI is served by Traefik on port 80 | `3000` |
+| `APP_PORT` | nginx | Host port of the whole app (gateway) | `80` |
+| `FRONTEND_PORT` | frontend | Not used anymore: the UI is served by the gateway on `APP_PORT` | `3000` |
 | `FRONTEND_PUBLIC_API1_URL` | frontend | Browser-facing URL for api1 (proxied by Nginx) | `/api1` |
 | `FRONTEND_PUBLIC_API2_URL` | frontend | Browser-facing URL for api2 (proxied by Nginx) | `/api2` |
 
-### API1 — Authentication Service
+### API1: Authentication Service
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
-| `API1_PORT` | api1 | Host port for the auth API | `8001` |
+| `API1_PORT` | api1 | Not used anymore: the replicas are only reachable through the gateway | `8001` |
 | `API1_LOG_LEVEL` | api1 | Logging level | `info` |
 | `API1_JWT_SECRET` | api1 | Secret key for signing tokens | `change_me_for_dev_only` |
 | `API1_TOKEN_TTL_SECONDS` | api1 | Token expiration time | `3600` |
@@ -199,11 +202,11 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 | `API1_DB_INIT_MAX_ATTEMPTS` | api1 | Max retries for DB connection at startup | `10` |
 | `API1_DB_INIT_RETRY_DELAY_SECONDS` | api1 | Delay between DB init retries | `2` |
 
-### API2 — Crypto Index Service
+### API2: Crypto Index Service
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
-| `API2_PORT` | api2 | Host port for the index API | `8002` |
+| `API2_PORT` | api2 | Not used anymore: the replicas are only reachable through the gateway | `8002` |
 | `API2_LOG_LEVEL` | api2 | Logging level | `info` |
 | `API2_DATABASE_URL` | api2 | PostgreSQL connection string for db2 | `postgresql+psycopg2://crypto_user:crypto_pass@db2:5432/crypto_index` |
 | `API2_DB_INIT_MAX_ATTEMPTS` | api2 | Max retries for DB connection at startup | `10` |
@@ -232,7 +235,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 ## API Endpoints
 
-### API1 — Authentication (`/api1`)
+### API1: Authentication (`/api1`)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -241,7 +244,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 | POST | `/login` | Log in and receive a bearer token | No |
 | GET | `/me` | Get current user info | Yes |
 
-### API2 — Crypto Indexes (`/api2`)
+### API2: Crypto Indexes (`/api2`)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -259,27 +262,27 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 Here is the typical user flow to demonstrate the application:
 
-1. **Register** — go to the register page, enter an email, name, and password. The account is created via api1.
+1. **Register**: go to the register page, enter an email, name, and password. The account is created via api1.
 
-2. **Log in** — use your credentials on the login page. A JWT token is stored in the browser for authenticated requests.
+2. **Log in**: use your credentials on the login page. A JWT token is stored in the browser for authenticated requests.
 
-3. **Create an index** — from the dashboard, open the create form. Pick a name (e.g. "My Top 3"), optionally add a description, then add assets with weights:
-   - BTC — 50%
-   - ETH — 30%
-   - SOL — 20%
+3. **Create an index**: from the dashboard, open the create form. Pick a name (e.g. "My Top 3"), optionally add a description, then add assets with weights:
+   - BTC: 50%
+   - ETH: 30%
+   - SOL: 20%
    - Weights must add up to 100%.
 
-4. **View your indexes** — the dashboard lists all your saved indexes with a quick summary of their composition.
+4. **View your indexes**: the dashboard lists all your saved indexes with a quick summary of their composition.
 
-5. **Inspect performance** — click on an index to see its detail page:
+5. **Inspect performance**: click on an index to see its detail page:
    - Composition breakdown (assets and weights)
    - Historical performance chart computed from real CoinGecko data
    - Toggle technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
    - Compare with other indexes or individual cryptos on a normalized chart
 
-6. **Edit an index** — update the name, description, or change the asset allocation.
+6. **Edit an index**: update the name, description, or change the asset allocation.
 
-7. **Delete an index** — remove an index you no longer want (with confirmation).
+7. **Delete an index**: remove an index you no longer want (with confirmation).
 
 ## CI/CD
 
@@ -287,7 +290,7 @@ The project uses GitHub Actions (`.github/workflows/ci.yaml`). The workflow was 
 
 **Pipeline steps**:
 1. Build Docker images for `frontend`, `api1`, and `api2`
-2. Scan each image with [Trivy](https://trivy.dev/) — fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
+2. Scan each image with [Trivy](https://trivy.dev/), which fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
 3. Push images to Docker Hub (only on `main` branch with credentials)
 
 **Image naming**: `docker.io/<namespace>/cryptoindexlab-<service>:<tag>`
@@ -303,12 +306,12 @@ Without credentials, the pipeline still builds and scans but skips the push step
 | Problem | Solution |
 |---------|----------|
 | Docker engine not running (Windows named pipe error) | Start Docker Desktop and wait until it's fully ready, then retry |
-| Services not healthy yet | Run `docker compose ps` and wait — healthchecks take a few seconds |
+| Services not healthy yet | Run `docker compose ps` and wait, healthchecks take a few seconds |
 | A backend fails to start | Check logs: `docker compose logs api1` or `docker compose logs api2` |
 | Database connection errors | Make sure `.env` exists and matches `.env.example` defaults |
 | CoinGecko rate limiting | Add a free API key in `API2_MARKET_DATA_API_KEY` or wait a few minutes |
 | Need a fresh start | `docker compose down -v` then `docker compose up --build -d` |
-| Port conflict | Free ports 80 and 8080 (Traefik), or change `API1_PORT` / `API2_PORT` in `.env` |
+| Port conflict | Free port 80, or set another `APP_PORT` in `.env` |
 
 ## Project Structure
 
@@ -324,7 +327,7 @@ CryptoIndexLab/
 │   │   │   ├── services/       # API clients (auth, indexes, session)
 │   │   │   └── views/          # View components (login, dashboard, etc.)
 │   │   └── vendor/             # Third-party libs (Lightweight Charts)
-│   ├── nginx/default.conf      # Nginx config with API proxying
+│   ├── nginx/default.conf      # Nginx config serving the SPA
 │   └── Dockerfile
 ├── api1/                       # Authentication microservice
 │   ├── src/
@@ -346,6 +349,7 @@ CryptoIndexLab/
 │   │   ├── schemas/            # Pydantic schemas
 │   │   └── services/           # Business logic + CoinGecko provider
 │   └── Dockerfile
+├── nginx/nginx.conf            # Gateway: frontend + load-balanced APIs
 ├── docs/                       # Additional documentation
 │   └── architecture.md
 ├── docker-compose.yaml         # Production-like stack definition

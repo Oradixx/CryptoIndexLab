@@ -44,8 +44,8 @@ class CreateIndexRequest(BaseModel):
             raise ValueError("Asset symbols must be unique within an index.")
 
         total_weight = sum(asset.weight for asset in self.assets)
-        if total_weight > 100:
-            raise ValueError("Total asset weight must be <= 100.")
+        if round(total_weight, 4) != 100:
+            raise ValueError("Total asset weight must equal exactly 100.")
 
         return self
 

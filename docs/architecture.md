@@ -4,17 +4,16 @@ This document describes how CryptoIndexLab is structured as a microservices appl
 
 ## Services
 
-### traefik
+### nginx (gateway)
 
-- **Tech**: Traefik v3.6 with the Docker provider (v3.6.1+ is required with Docker Engine 29, which dropped the old API version used by earlier releases).
-- **Role**: single entry point on port 80. It only exposes containers that opt in with labels (`exposedbydefault=false`); every request is routed to the frontend (`PathPrefix(/)`), whatever the host name, so the app also works behind the GitHub Codespaces URL.
-- **Dashboard**: port 8080, insecure mode (local development only).
+- **Tech**: Nginx 1.27 (Alpine), configured in `nginx/nginx.conf`.
+- **Role**: single entry point on port 80 (`APP_PORT`). `/` goes to the frontend, `/api1/*` to api1 and `/api2/*` to api2, with the prefix stripped. It answers any host name, so the app also works behind the GitHub Codespaces URL.
+- **Load balancing**: api1 and api2 run 2 replicas each (`deploy.replicas: 2`). The upstreams are variables resolved through Docker's DNS (`resolver 127.0.0.11 valid=10s`), which returns one address per replica, and Nginx spreads the requests across them.
 
 ### frontend
 
 - **Tech**: Nginx 1.27.5 (unprivileged Alpine image) serving a vanilla JavaScript SPA.
-- **Role**: serves the web UI and acts as a reverse proxy for backend APIs.
-- **Routing**: Nginx forwards `/api1/*` to `api1:8001` and `/api2/*` to `api2:8002`, so the browser never talks to backend containers directly. This avoids CORS configuration entirely.
+- **Role**: serves the web UI. API calls use relative paths (`/api1`, `/api2`) that the gateway routes, so the browser never talks to backend containers directly and no CORS configuration is needed.
 - **Auth**: the frontend stores a JWT token in localStorage and attaches it as a `Bearer` header on every authenticated request.
 
 ### api1 — Authentication Service
@@ -54,11 +53,11 @@ frontend ──proxy──▶ api2 ──SQL──▶ db2
                     └──HTTP──▶ CoinGecko (market data)
 ```
 
-The same rule is enforced by the Docker networks: `db1` is only on `api1-db-net` (with api1), `db2` only on `api2-db-net` (with api2), and `frontend-net` connects traefik, the frontend and both APIs.
+The same rule is enforced by the Docker networks: `db1` is only on `api1-db-net` (with api1), `db2` only on `api2-db-net` (with api2), and `frontend-net` connects the gateway, the frontend and both APIs.
 
 **What is allowed:**
-- frontend → api1 (Nginx proxy)
-- frontend → api2 (Nginx proxy)
+- browser → api1 (through the Nginx gateway)
+- browser → api2 (through the Nginx gateway)
 - api1 → db1 (SQL, via `API1_DATABASE_URL`)
 - api2 → db2 (SQL, via `API2_DATABASE_URL`)
 - api2 → api1 (HTTP, for token validation via `API2_AUTH_API1_ME_URL`)
@@ -72,7 +71,7 @@ The same rule is enforced by the Docker networks: `db1` is only on `api1-db-net`
 
 ## Docker Compose Orchestration
 
-Services run on three bridge networks: `frontend-net` (traefik, frontend, api1, api2), `api1-db-net` (api1, db1) and `api2-db-net` (api2, db2). Service isolation is enforced both by application configuration (each service only has the connection strings it needs) and by the networks (a service cannot reach a database it does not share a network with).
+Services run on three bridge networks: `frontend-net` (nginx, frontend, api1, api2), `api1-db-net` (api1, db1) and `api2-db-net` (api2, db2). Service isolation is enforced both by application configuration (each service only has the connection strings it needs) and by the networks (a service cannot reach a database it does not share a network with).
 
 ### Startup Order
 
@@ -131,7 +130,7 @@ index_assets
 ### User creates an index
 
 1. Browser sends `POST /api2/indexes` with bearer token and index payload
-2. Nginx forwards the request to `api2:8002/indexes`
+2. The Nginx gateway forwards the request to one of the api2 replicas (`api2:8002/indexes`)
 3. api2 extracts the bearer token and calls `GET http://api1:8001/me` to validate it
 4. api1 checks the token, returns user info (or 401)
 5. api2 validates the index payload (name, assets, weights summing to 100%)

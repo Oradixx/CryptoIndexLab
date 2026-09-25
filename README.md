@@ -2,6 +2,10 @@
 
 A microservices web application where users create and monitor custom cryptocurrency indexes — weighted baskets of coins tracked over time with historical performance charts.
 
+![Index detail page: allocation, candlestick chart with an indicator, and window statistics](docs/images/index-detail.png)
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Oradixx/CryptoIndexLab?quickstart=1)
+
 Built as a school project to learn containerization, service isolation, and Docker Compose orchestration (Containerization Technologies course, ESILV, March 2026). The project was first hosted on the school's Gitea; this repository is a mirror with the full commit history.
 
 ## Features
@@ -53,7 +57,7 @@ graph TB
     CoinGecko([CoinGecko API])
 
     Browser -->|HTTP| Traefik
-    Traefik -->|Host: localhost| Frontend
+    Traefik -->|all requests| Frontend
     Frontend -->|/api1/*| API1
     Frontend -->|/api2/*| API2
     API1 -->|SQL| DB1
@@ -93,7 +97,7 @@ So api1 cannot even resolve `db2`, and the frontend cannot reach either database
 
 | Service | Role | Port |
 |---------|------|------|
-| `traefik` | Reverse proxy, routes `localhost` to the frontend | 80 (dashboard on 8080) |
+| `traefik` | Reverse proxy, routes every request to the frontend | 80 (dashboard on 8080) |
 | `frontend` | SPA served by Nginx, proxies API calls to backends | 8080 (internal, behind Traefik) |
 | `api1` | User registration, login, JWT token management | 8001 |
 | `api2` | Index CRUD, market data retrieval, performance calculation | 8002 |
@@ -102,12 +106,18 @@ So api1 cannot even resolve `db2`, and the frontend cannot reach either database
 
 ## Getting Started
 
-### Prerequisites
+### Try it in the browser (no install)
+
+Click **Open in GitHub Codespaces** above. GitHub starts a cloud machine with Docker, the stack starts automatically (`docker compose up`, about 2 minutes the first time), and the app opens on the forwarded port 80. If it does not open by itself, go to the **Ports** tab and open port 80. Codespaces uses the free monthly quota of your own GitHub account.
+
+### Run it locally
+
+**Prerequisites**
 
 - [Docker](https://www.docker.com/) and Docker Compose (included with Docker Desktop)
 - Git
 
-### Installation
+**Installation**
 
 ```bash
 # 1. Clone the repository

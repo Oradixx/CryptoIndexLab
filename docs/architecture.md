@@ -7,7 +7,7 @@ This document describes how CryptoIndexLab is structured as a microservices appl
 ### traefik
 
 - **Tech**: Traefik v3.6 with the Docker provider (v3.6.1+ is required with Docker Engine 29, which dropped the old API version used by earlier releases).
-- **Role**: single entry point on port 80. It only exposes containers that opt in with labels (`exposedbydefault=false`); the frontend is routed on `Host(localhost)`.
+- **Role**: single entry point on port 80. It only exposes containers that opt in with labels (`exposedbydefault=false`); every request is routed to the frontend (`PathPrefix(/)`), whatever the host name, so the app also works behind the GitHub Codespaces URL.
 - **Dashboard**: port 8080, insecure mode (local development only).
 
 ### frontend

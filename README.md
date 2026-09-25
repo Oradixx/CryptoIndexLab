@@ -20,7 +20,7 @@ Built as a school project to learn containerization, service isolation, and Dock
 | Layer | Technology | Details |
 |-------|-----------|---------|
 | Frontend | Vanilla JavaScript (ES6 modules) | Single-page app with client-side routing |
-| Reverse proxy | Traefik v3.0 | Single entry point on port 80, routes to the frontend via Docker labels |
+| Reverse proxy | Traefik v3.6 | Single entry point on port 80, routes to the frontend via Docker labels |
 | Frontend server | Nginx 1.27.5 (unprivileged Alpine) | Serves static files and proxies API calls |
 | Charts | Lightweight Charts 4.2 | TradingView charting library |
 | Backend APIs | Python 3.12 + FastAPI | Two independent microservices |

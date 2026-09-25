@@ -163,6 +163,7 @@ The stack is defined in `docker-compose.yaml` and includes 6 services (traefik, 
 - Healthchecks defined in each Dockerfile for portability
 - Service-level `.dockerignore` files to minimize build contexts
 - `pip check` during build to catch broken dependencies early
+- No packaging tools in the runtime images: pip, setuptools and wheel are removed after the dependencies are installed
 
 ## Environment Variables
 

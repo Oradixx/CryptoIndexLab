@@ -33,6 +33,12 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
 
 COPY --from=builder /opt/venv /opt/venv
 
+# The runtime only needs the installed packages: remove the packaging tools
+# (pip, setuptools, wheel) from the venv and from the base image, so they are
+# not flagged by the vulnerability scan and cannot be used inside the container.
+RUN /opt/venv/bin/python -m pip uninstall --yes setuptools wheel pip \
+    && /usr/local/bin/python -m pip uninstall --yes setuptools wheel pip
+
 COPY --chown=appuser:appgroup src ./src
 
 USER appuser

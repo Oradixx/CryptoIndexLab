@@ -23,7 +23,7 @@ jobs:
       IMAGE_TAG_OVERRIDE: ${{ secrets.IMAGE_TAG }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve pipeline variables
         shell: bash

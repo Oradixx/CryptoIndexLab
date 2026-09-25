@@ -4,6 +4,12 @@ This document describes how CryptoIndexLab is structured as a microservices appl
 
 ## Services
 
+### traefik
+
+- **Tech**: Traefik v3.0 with the Docker provider.
+- **Role**: single entry point on port 80. It only exposes containers that opt in with labels (`exposedbydefault=false`); the frontend is routed on `Host(localhost)`.
+- **Dashboard**: port 8080, insecure mode (local development only).
+
 ### frontend
 
 - **Tech**: Nginx 1.27.5 (unprivileged Alpine image) serving a vanilla JavaScript SPA.
@@ -48,6 +54,8 @@ frontend ──proxy──▶ api2 ──SQL──▶ db2
                     └──HTTP──▶ CoinGecko (market data)
 ```
 
+The same rule is enforced by the Docker networks: `db1` is only on `api1-db-net` (with api1), `db2` only on `api2-db-net` (with api2), and `frontend-net` connects traefik, the frontend and both APIs.
+
 **What is allowed:**
 - frontend → api1 (Nginx proxy)
 - frontend → api2 (Nginx proxy)
@@ -64,7 +72,7 @@ frontend ──proxy──▶ api2 ──SQL──▶ db2
 
 ## Docker Compose Orchestration
 
-All services run on a single bridge network (`cryptoindexlab-net`). Service isolation is enforced by application configuration (each service only has the connection strings it needs), not by separate Docker networks.
+Services run on three bridge networks: `frontend-net` (traefik, frontend, api1, api2), `api1-db-net` (api1, db1) and `api2-db-net` (api2, db2). Service isolation is enforced both by application configuration (each service only has the connection strings it needs) and by the networks (a service cannot reach a database it does not share a network with).
 
 ### Startup Order
 

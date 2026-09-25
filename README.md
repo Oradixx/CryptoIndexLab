@@ -2,7 +2,7 @@
 
 A microservices web application where users create and monitor custom cryptocurrency indexes — weighted baskets of coins tracked over time with historical performance charts.
 
-Built as a school project to learn containerization, service isolation, and Docker Compose orchestration.
+Built as a school project to learn containerization, service isolation, and Docker Compose orchestration (Containerization Technologies course, ESILV, March 2026). The project was first hosted on the school's Gitea; this repository is a mirror with the full commit history.
 
 ## Features
 
@@ -20,13 +20,14 @@ Built as a school project to learn containerization, service isolation, and Dock
 | Layer | Technology | Details |
 |-------|-----------|---------|
 | Frontend | Vanilla JavaScript (ES6 modules) | Single-page app with client-side routing |
+| Reverse proxy | Traefik v3.0 | Single entry point on port 80, routes to the frontend via Docker labels |
 | Frontend server | Nginx 1.27.5 (unprivileged Alpine) | Serves static files and proxies API calls |
 | Charts | Lightweight Charts 4.2 | TradingView charting library |
 | Backend APIs | Python 3.12 + FastAPI | Two independent microservices |
 | Databases | PostgreSQL 16 (Alpine) | One dedicated instance per API |
 | Market data | CoinGecko API | Historical daily prices with in-memory cache |
 | Containerization | Docker + Docker Compose | Multi-stage builds, non-root users, healthchecks |
-| CI/CD | Gitea Actions | Build, Trivy vulnerability scan, Docker Hub push |
+| CI/CD | GitHub Actions (originally Gitea Actions) | Build, Trivy vulnerability scan, optional Docker Hub push |
 
 ## Architecture
 
@@ -35,7 +36,8 @@ graph TB
     Browser([Browser])
 
     subgraph Docker Compose
-        Frontend["frontend<br/><small>Nginx · port 3000</small>"]
+        Traefik["traefik<br/><small>reverse proxy · port 80</small>"]
+        Frontend["frontend<br/><small>Nginx · port 8080</small>"]
 
         subgraph Authentication
             API1["api1<br/><small>FastAPI · port 8001</small>"]
@@ -50,7 +52,8 @@ graph TB
 
     CoinGecko([CoinGecko API])
 
-    Browser -->|HTTP| Frontend
+    Browser -->|HTTP| Traefik
+    Traefik -->|Host: localhost| Frontend
     Frontend -->|/api1/*| API1
     Frontend -->|/api2/*| API2
     API1 -->|SQL| DB1
@@ -76,11 +79,22 @@ The services follow strict separation — this is a key part of the project:
 
 Each API only receives the `DATABASE_URL` for its own database. There is no shared database, no shared schema, and no direct database-to-database link. Cross-service communication happens exclusively through HTTP APIs.
 
+The isolation is also enforced at the **network level**: each database sits on its own Docker network, shared only with its API.
+
+| Network | Services |
+|---------|----------|
+| `frontend-net` | traefik, frontend, api1, api2 |
+| `api1-db-net` | api1, db1 |
+| `api2-db-net` | api2, db2 |
+
+So api1 cannot even resolve `db2`, and the frontend cannot reach either database.
+
 ### Service Overview
 
 | Service | Role | Port |
 |---------|------|------|
-| `frontend` | SPA served by Nginx, proxies API calls to backends | 3000 |
+| `traefik` | Reverse proxy, routes `localhost` to the frontend | 80 (dashboard on 8080) |
+| `frontend` | SPA served by Nginx, proxies API calls to backends | 8080 (internal, behind Traefik) |
 | `api1` | User registration, login, JWT token management | 8001 |
 | `api2` | Index CRUD, market data retrieval, performance calculation | 8002 |
 | `db1` | PostgreSQL database dedicated to api1 (users table) | internal |
@@ -97,7 +111,7 @@ Each API only receives the `DATABASE_URL` for its own database. There is no shar
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
+git clone https://github.com/Oradixx/CryptoIndexLab.git
 cd CryptoIndexLab
 
 # 2. Create your environment file
@@ -111,7 +125,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Once all services show `healthy`, open **http://localhost:3000** in your browser.
+Once all services show `healthy`, open **http://localhost** in your browser (Traefik listens on port 80; its dashboard is on http://localhost:8080 — insecure mode, for local development only).
 
 ### Frontend Hot Reload (Development)
 
@@ -132,7 +146,7 @@ docker compose down -v         # stops containers AND deletes database volumes
 
 ## Docker Orchestration
 
-The stack is defined in `docker-compose.yaml` and includes 5 services on a single bridge network (`cryptoindexlab-net`).
+The stack is defined in `docker-compose.yaml` and includes 6 services (traefik, frontend, api1, api2, db1, db2) on three bridge networks (see [Communication Rules](#communication-rules)).
 
 **Startup order** is managed with healthchecks:
 1. `db1` and `db2` start first (PostgreSQL readiness check via `pg_isready`)
@@ -158,7 +172,7 @@ All variables are defined in `.env.example` with sensible defaults. Copy it to `
 
 | Variable | Service | Description | Default |
 |----------|---------|-------------|---------|
-| `FRONTEND_PORT` | frontend | Host port for the web UI | `3000` |
+| `FRONTEND_PORT` | frontend | Not used anymore: the UI is served by Traefik on port 80 | `3000` |
 | `FRONTEND_PUBLIC_API1_URL` | frontend | Browser-facing URL for api1 (proxied by Nginx) | `/api1` |
 | `FRONTEND_PUBLIC_API2_URL` | frontend | Browser-facing URL for api2 (proxied by Nginx) | `/api2` |
 
@@ -256,11 +270,9 @@ Here is the typical user flow to demonstrate the application:
 
 7. **Delete an index** — remove an index you no longer want (with confirmation).
 
-> **Screenshots**: demo screenshots will be added to `docs/screenshots/` before the final presentation.
-
 ## CI/CD
 
-The project uses Gitea Actions (`.gitea/workflows/ci.yaml`).
+The project uses GitHub Actions (`.github/workflows/ci.yaml`). The workflow was written for Gitea Actions, which uses the same syntax; it was moved unchanged.
 
 **Pipeline steps**:
 1. Build Docker images for `frontend`, `api1`, and `api2`
@@ -269,7 +281,7 @@ The project uses Gitea Actions (`.gitea/workflows/ci.yaml`).
 
 **Image naming**: `docker.io/<namespace>/cryptoindexlab-<service>:<tag>`
 
-**Required Gitea secrets** for Docker Hub push:
+**Required repository secrets** for Docker Hub push:
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
@@ -285,7 +297,7 @@ Without credentials, the pipeline still builds and scans but skips the push step
 | Database connection errors | Make sure `.env` exists and matches `.env.example` defaults |
 | CoinGecko rate limiting | Add a free API key in `API2_MARKET_DATA_API_KEY` or wait a few minutes |
 | Need a fresh start | `docker compose down -v` then `docker compose up --build -d` |
-| Port conflict | Change `FRONTEND_PORT`, `API1_PORT`, or `API2_PORT` in `.env` |
+| Port conflict | Free ports 80 and 8080 (Traefik), or change `API1_PORT` / `API2_PORT` in `.env` |
 
 ## Project Structure
 
@@ -328,7 +340,7 @@ CryptoIndexLab/
 ├── docker-compose.yaml         # Production-like stack definition
 ├── docker-compose.dev.yaml     # Dev override (frontend hot reload)
 ├── .env.example                # Environment variable template
-├── .gitea/workflows/ci.yaml    # CI/CD pipeline
+├── .github/workflows/ci.yaml   # CI/CD pipeline
 └── AUTHORS.md                  # Team members
 ```
 

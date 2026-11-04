@@ -191,7 +191,6 @@ def test_me_rejects_a_valid_token_for_a_deleted_user(client, alice, alice_token,
     assert client.get("/me", headers=bearer(alice_token)).status_code == 401
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="bug: non-ASCII token makes /me return HTTP 500")
 def test_me_rejects_a_token_with_non_ascii_characters(app, alice):
     # HTTP header values are decoded as latin-1, so a client can send any byte.
     with TestClient(app, raise_server_exceptions=False) as raw_client:

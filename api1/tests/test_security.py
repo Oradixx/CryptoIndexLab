@@ -164,6 +164,5 @@ def test_malformed_token_is_rejected(token):
     assert SimpleTokenManager(secret_key=SECRET).extract_user_id(token) is None
 
 
-@pytest.mark.xfail(raises=TypeError, reason="bug: compare_digest raises on non-ASCII text")
 def test_token_with_non_ascii_characters_is_rejected():
     assert SimpleTokenManager(secret_key=SECRET).extract_user_id("abc.é") is None

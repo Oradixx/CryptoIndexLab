@@ -10,7 +10,9 @@ class Api1IdentityService:
 
     def get_user_id_from_token(self, token: str) -> str:
         normalized_token = token.strip()
-        if not normalized_token:
+        # A bearer token is ASCII (RFC 6750). httpx cannot put anything else in
+        # a header and would raise UnicodeEncodeError instead of an HTTPError.
+        if not normalized_token or not normalized_token.isascii():
             raise UnauthorizedRequestError("Unauthorized.")
 
         headers = {"Authorization": f"Bearer {normalized_token}"}

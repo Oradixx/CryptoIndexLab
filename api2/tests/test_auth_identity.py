@@ -105,7 +105,6 @@ def test_api1_unreachable_is_rejected(mock_http, identity):
         identity.get_user_id_from_token("token")
 
 
-@pytest.mark.xfail(raises=UnicodeEncodeError, reason="bug: non-ASCII token crashes the api1 call")
 def test_non_ascii_token_is_rejected(mock_http, identity):
     mock_http(fake_api1)
 
@@ -153,7 +152,6 @@ def test_routes_answer_401_when_api1_does_not_confirm_the_token(
     assert response.status_code == 401
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="bug: non-ASCII token makes api2 return HTTP 500")
 def test_routes_answer_401_to_a_non_ascii_token(mock_http, client_with_real_identity):
     mock_http(fake_api1)
 

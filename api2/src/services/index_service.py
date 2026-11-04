@@ -160,17 +160,20 @@ class IndexService:
             if not asset:
                 raise DomainValidationError(f"Unsupported asset symbol: {normalized_symbol}.")
 
-            if weight <= 0 or weight > 100:
+            # Weights are stored with 4 decimals: check the rounded value, so
+            # that the stored composition is the one that was validated.
+            stored_weight = round(weight, 4)
+            if stored_weight <= 0 or stored_weight > 100:
                 raise DomainValidationError(
                     f"Invalid weight for {normalized_symbol}. Use a value between 0 and 100."
                 )
 
-            total_weight += weight
+            total_weight += stored_weight
             used_symbols.add(normalized_symbol)
             validated_assets.append(
                 IndexAsset(
                     symbol=asset.symbol,
-                    weight=round(weight, 4),
+                    weight=stored_weight,
                 )
             )
 

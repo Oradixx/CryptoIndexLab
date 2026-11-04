@@ -123,10 +123,6 @@ def test_invalid_composition_is_also_rejected_on_update(client):
     assert response.status_code == 422
 
 
-@pytest.mark.xfail(
-    raises=AssertionError,
-    reason="bug: weights are validated before being rounded to 4 decimals for storage",
-)
 @pytest.mark.parametrize(
     "assets",
     [
@@ -144,6 +140,35 @@ def test_an_accepted_composition_still_sums_to_100_once_stored(client, assets):
         assert all(asset["weight"] > 0 for asset in body["assets"])
     else:
         assert response.status_code in (400, 422)
+
+
+@pytest.mark.parametrize(
+    ("assets", "detail"),
+    [
+        # 0.00001 is stored as 0.0.
+        (
+            [("BTC", 99.99999), ("ETH", 0.00001)],
+            "Invalid weight for ETH. Use a value between 0 and 100.",
+        ),
+        # Each weight is stored as 33.3333, so the stored total is 99.9999.
+        (
+            [("BTC", 33.33333), ("ETH", 33.33333), ("SOL", 33.33334)],
+            "Total asset weight must equal exactly 100.",
+        ),
+    ],
+    ids=["weight-rounds-to-zero", "total-rounds-to-99.9999"],
+)
+def test_weights_are_validated_as_they_are_stored(client, assets, detail):
+    created = post_index(client, [("BTC", 100)]).json()
+
+    on_create = post_index(client, assets)
+    on_update = client.put(
+        f"/indexes/{created['id']}", json=index_payload(assets=assets), headers=ALICE
+    )
+
+    for response in (on_create, on_update):
+        assert response.status_code == 400
+        assert response.json() == {"detail": detail}
 
 
 def test_weights_are_stored_with_4_decimals(client):

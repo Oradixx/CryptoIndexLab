@@ -8,6 +8,8 @@ A microservices web application where users create and monitor custom cryptocurr
 
 Built as a school project to learn containerization, service isolation, and Docker Compose orchestration (Containerization Technologies course, ESILV, March 2026). The project was first hosted on the school's Gitea; this repository is a mirror with the full commit history. The final version was demoed on an AWS Lightsail server.
 
+The automated tests were added after the course project and were not part of the demoed version (see [Tests](#tests)).
+
 ## Features
 
 - **User accounts**: register, log in, and manage a personal session with JWT-based authentication.
@@ -31,7 +33,8 @@ Built as a school project to learn containerization, service isolation, and Dock
 | Databases | PostgreSQL 16 (Alpine) | One dedicated instance per API |
 | Market data | CoinGecko API | Historical daily prices with in-memory cache |
 | Containerization | Docker + Docker Compose | Multi-stage builds, non-root users, healthchecks |
-| CI/CD | GitHub Actions (originally Gitea Actions) | Build, Trivy vulnerability scan, optional Docker Hub push |
+| Tests | pytest | API test suites, added after the course project |
+| CI/CD | GitHub Actions (originally Gitea Actions) | Tests, build, Trivy vulnerability scan, optional Docker Hub push |
 
 ## Architecture
 
@@ -284,14 +287,36 @@ Here is the typical user flow to demonstrate the application:
 
 7. **Delete an index**: remove an index you no longer want (with confirmation).
 
+## Tests
+
+> Added after the course project: the version demoed in March 2026 had no automated tests. The `tests/` folders, this section and the test job of the CI came later.
+
+Each API has its own pytest suite (`api1/tests`, `api2/tests`). They run without Docker, PostgreSQL or network access:
+
+- **Isolated database**: every test gets a fresh in-memory SQLite database, created by the real startup code (`init_db`).
+- **No external calls**: CoinGecko is replaced by a fake provider serving fixed prices (`api2/tests/mock_market_data.py`), and api2's token check against api1 by a fake identity service. The HTTP clients themselves are tested with `httpx.MockTransport`. Real connections and DNS lookups are refused during the tests, so a test that tried to reach CoinGecko would fail.
+- **api1**: registration, login, the signed token (rebuilt with `hmac` in the tests to check its format) and `/me`, with the error cases (duplicate or invalid email, wrong credentials, missing, malformed, expired or forged token).
+- **api2**: index CRUD and per-user isolation, weight validation, the market history route and its cache, CoinGecko response parsing, and the performance series, checked against values worked out by hand in `mock_market_data.py`.
+- The technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands) are computed by the frontend, not by the APIs, so they are not covered.
+
+Run a suite (Python 3.12, from the API folder, since each API has its own `src` package):
+
+```bash
+cd api1   # or api2
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## CI/CD
 
 The project uses GitHub Actions (`.github/workflows/ci.yaml`). The workflow was written for Gitea Actions, which uses the same syntax; it was moved unchanged.
 
 **Pipeline steps**:
-1. Build Docker images for `frontend`, `api1`, and `api2`
-2. Scan each image with [Trivy](https://trivy.dev/), which fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
-3. Push images to Docker Hub (only on `main` branch with credentials)
+1. Run the pytest suites of `api1` and `api2` (added after the course project, see [Tests](#tests)); the images are not built if a test fails
+2. Build Docker images for `frontend`, `api1`, and `api2`
+3. Scan each image with [Trivy](https://trivy.dev/), which fails on MEDIUM, HIGH, or CRITICAL vulnerabilities
+4. Push images to Docker Hub (only on `main` branch with credentials)
 
 **Image naming**: `docker.io/<namespace>/cryptoindexlab-<service>:<tag>`
 
@@ -338,6 +363,7 @@ CryptoIndexLab/
 │   │   ├── routes/             # FastAPI endpoints
 │   │   ├── schemas/            # Pydantic request/response schemas
 │   │   └── services/           # Business logic (AuthService)
+│   ├── tests/                  # pytest suite (added after the course project)
 │   └── Dockerfile
 ├── api2/                       # Crypto index microservice
 │   ├── src/
@@ -348,6 +374,7 @@ CryptoIndexLab/
 │   │   ├── routes/             # FastAPI endpoints
 │   │   ├── schemas/            # Pydantic schemas
 │   │   └── services/           # Business logic + CoinGecko provider
+│   ├── tests/                  # pytest suite (added after the course project)
 │   └── Dockerfile
 ├── nginx/nginx.conf            # Gateway: frontend + load-balanced APIs
 ├── docs/                       # Additional documentation

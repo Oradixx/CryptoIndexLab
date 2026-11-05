@@ -71,7 +71,12 @@ class SimpleTokenManager:
             return None
 
         expected_signature = _urlsafe_b64encode(self._sign(payload_segment))
-        if not hmac.compare_digest(signature_segment, expected_signature):
+        # Compare bytes: compare_digest raises TypeError on str values that
+        # contain non-ASCII characters, which a client can put in the header.
+        if not hmac.compare_digest(
+            signature_segment.encode("utf-8"),
+            expected_signature.encode("utf-8"),
+        ):
             return None
 
         try:
